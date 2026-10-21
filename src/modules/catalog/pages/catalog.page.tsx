@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { useDeferredValue, useMemo, useState } from "react";
-import heroApeImage from "assets/hero-ape.png";
+import heroApeImage from "assets/images/ape-bucket-hat.png";
 import { getApiError } from "shared/api/api-error";
 import { getCatalog, queryKeys } from "shared/api/marketplace.api";
 import { Button } from "shared/components/ui/button";
