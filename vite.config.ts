@@ -7,10 +7,16 @@ const socketMockPlugin = (): Plugin => ({
   name: "kurio-socket-mock",
   configureServer: (server) => {
     if (!server.httpServer) return;
-    const socketServer = new Server(server.httpServer, { cors: { origin: true } });
+    const socketServer = new Server(server.httpServer, {
+      cors: { origin: true },
+    });
     socketServer.on("connection", (socket) => {
-      socket.on("demo:nft-update", (event) => socketServer.emit("nft.updated", event));
-      socket.on("demo:order-update", (event) => socketServer.emit("order.updated", event));
+      socket.on("demo:nft-update", (event) =>
+        socketServer.emit("nft.updated", event),
+      );
+      socket.on("demo:order-update", (event) =>
+        socketServer.emit("order.updated", event),
+      );
     });
   },
 });
