@@ -1,0 +1,70 @@
+@import url("https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-canvas: #160e0a;
+  --color-surface: #21130f;
+  --color-panel: #2b1812;
+  --color-border: #4b2b20;
+  --color-foreground: #f5f1eb;
+  --color-text-secondary: #cfb28c;
+  --color-text-accent: #e89b55;
+  --color-primary: #d28a4c;
+  --color-primary-hover: #bd7437;
+  --color-danger: #d85c55;
+  --radius: 0.6rem;
+  color: var(--color-foreground);
+  background: var(--color-canvas);
+  font-family: "Roboto Mono", ui-monospace, monospace;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+html {
+  background: var(--color-canvas);
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(
+      circle at 85% -10%,
+      rgba(225, 146, 75, 0.11),
+      transparent 30rem
+    ),
+    var(--color-canvas);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
