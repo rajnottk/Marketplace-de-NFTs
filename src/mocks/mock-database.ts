@@ -27,6 +27,7 @@ import {
   nftFixtures,
 } from "mocks/fixtures/nfts";
 import type { VerifiedFirebaseIdentity } from "mocks/auth/verify-firebase-token";
+import { persistMockState } from "mocks/persistence";
 
 interface MockUser extends User {
   passwordHash: string;
@@ -122,9 +123,9 @@ const readPersistedState = (): MockState | null => {
 let state = readPersistedState() ?? createInitialState();
 
 const commitState = (nextState: MockState) => {
-  state = nextState;
   if (typeof window !== "undefined")
-    window.localStorage.setItem(persistenceKey, JSON.stringify(state));
+    persistMockState(persistenceKey, JSON.stringify(nextState));
+  state = nextState;
 };
 
 const toPublicUser = (user: MockUser): User => ({

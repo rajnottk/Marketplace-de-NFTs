@@ -3,7 +3,7 @@ import { completeCollectorLogin } from "../helpers/auth";
 
 test("preserva o carrinho do visitante ao autenticar e conclui uma compra", async ({
   page,
-}) => {
+}, testInfo) => {
   await page.goto("/nfts/emerald-ape-042");
   await page.getByRole("button", { name: /^(Comprar|Comprar NFT)$/ }).click();
   await expect(
@@ -25,11 +25,24 @@ test("preserva o carrinho do visitante ao autenticar e conclui uma compra", asyn
   await expect(
     page.getByRole("button", { name: /Tem um código promocional/ }),
   ).toHaveCount(0);
-  await expect(page.getByText("Código KURIO10 aplicado.")).toBeVisible();
+  const isMobile = testInfo.project.name === "mobile";
+  if (isMobile)
+    await page
+      .getByRole("button", { name: "Trocar carteira", exact: true })
+      .click();
+  else await expect(page.getByText("Código KURIO10 aplicado.")).toBeVisible();
   await page.getByLabel("Nome de usuário").fill("ana-coleciona");
   await page.getByLabel("Nome do perfil").fill("Coleção da Ana");
   await page.getByRole("combobox", { name: "Tipo de carteira" }).click();
   await page.getByRole("option", { name: "MetaMask", exact: true }).click();
+  if (isMobile) {
+    await page
+      .getByRole("button", { name: "Salvar carteira", exact: true })
+      .click();
+    await expect(
+      page.getByRole("dialog", { name: "Configurar carteira" }),
+    ).toHaveCount(0);
+  }
   await page
     .getByRole("group", { name: "Carteira e rede" })
     .getByRole("radio", { name: "MetaMask", exact: true })

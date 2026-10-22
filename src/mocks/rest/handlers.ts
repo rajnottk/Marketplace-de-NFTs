@@ -33,6 +33,7 @@ import {
   walletSchema,
 } from "shared/contracts/marketplace";
 import { verifyFirebaseToken } from "mocks/auth/verify-firebase-token";
+import { MockPersistenceError } from "mocks/persistence";
 
 const apiError = (
   code: string,
@@ -40,6 +41,16 @@ const apiError = (
   status: number,
   fieldErrors?: Record<string, string>,
 ) => HttpResponse.json({ error: { code, message, fieldErrors } }, { status });
+
+const withPersistenceErrors = (resolve: () => Response): Response => {
+  try {
+    return resolve();
+  } catch (error) {
+    if (error instanceof MockPersistenceError)
+      return apiError(error.code, error.message, 507);
+    throw error;
+  }
+};
 
 const getSessionToken = (request: Request) =>
   request.headers.get("x-session-token");
@@ -289,16 +300,18 @@ export const handlers = [
         "Chave de idempotência ausente.",
         422,
       );
-    const order = createOrder(
-      getSessionToken(request),
-      parsed.data.network,
-      idempotencyKey,
-    );
-    if (order === "unauthorized")
-      return apiError("UNAUTHORIZED", "Entre para finalizar a compra.", 401);
-    if (order === "empty-cart")
-      return apiError("CONFLICT", "Seu carrinho está vazio.", 409);
-    return HttpResponse.json(order, { status: 201 });
+    return withPersistenceErrors(() => {
+      const order = createOrder(
+        getSessionToken(request),
+        parsed.data.network,
+        idempotencyKey,
+      );
+      if (order === "unauthorized")
+        return apiError("UNAUTHORIZED", "Entre para finalizar a compra.", 401);
+      if (order === "empty-cart")
+        return apiError("CONFLICT", "Seu carrinho está vazio.", 409);
+      return HttpResponse.json(order, { status: 201 });
+    });
   }),
 
   http.get("/api/orders/:orderId", async ({ params, request }) => {
@@ -378,12 +391,14 @@ export const handlers = [
       .safeParse(await request.json());
     if (!parsed.success)
       return apiError("VALIDATION_ERROR", "Dados da carteira inválidos.", 422);
-    const wallets = saveWallet(getSessionToken(request), parsed.data);
-    if (wallets === "unauthorized")
-      return apiError("UNAUTHORIZED", "Entre para salvar uma carteira.", 401);
-    if (wallets === "not-found")
-      return apiError("NOT_FOUND", "Carteira não encontrada.", 404);
-    return HttpResponse.json(wallets, { status: 201 });
+    return withPersistenceErrors(() => {
+      const wallets = saveWallet(getSessionToken(request), parsed.data);
+      if (wallets === "unauthorized")
+        return apiError("UNAUTHORIZED", "Entre para salvar uma carteira.", 401);
+      if (wallets === "not-found")
+        return apiError("NOT_FOUND", "Carteira não encontrada.", 404);
+      return HttpResponse.json(wallets, { status: 201 });
+    });
   }),
   http.patch("/api/wallets/:walletId", async ({ request, params }) => {
     await waitForMockNetwork();
@@ -392,14 +407,16 @@ export const handlers = [
       .safeParse(await request.json());
     if (!parsed.success)
       return apiError("VALIDATION_ERROR", "Dados da carteira inválidos.", 422);
-    const wallets = saveWallet(getSessionToken(request), {
-      ...parsed.data,
-      id: String(params.walletId),
+    return withPersistenceErrors(() => {
+      const wallets = saveWallet(getSessionToken(request), {
+        ...parsed.data,
+        id: String(params.walletId),
+      });
+      if (wallets === "unauthorized")
+        return apiError("UNAUTHORIZED", "Entre para salvar uma carteira.", 401);
+      if (wallets === "not-found")
+        return apiError("NOT_FOUND", "Carteira não encontrada.", 404);
+      return HttpResponse.json(wallets);
     });
-    if (wallets === "unauthorized")
-      return apiError("UNAUTHORIZED", "Entre para salvar uma carteira.", 401);
-    if (wallets === "not-found")
-      return apiError("NOT_FOUND", "Carteira não encontrada.", 404);
-    return HttpResponse.json(wallets);
   }),
 ];

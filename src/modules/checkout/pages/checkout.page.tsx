@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { MobileCheckout } from "modules/checkout/components/mobile-checkout";
+import { isWalletConfigured } from "modules/checkout/components/collector-values";
 import { CollectorForm } from "modules/checkout/components/collector-form";
 import { CheckoutSummary } from "modules/checkout/components/checkout-summary";
 import {
@@ -27,11 +29,13 @@ import {
 import { EmptyState } from "shared/components/ui/empty-state";
 import type { Cart, Network, Quote } from "shared/contracts/marketplace";
 import { useSession } from "shared/hooks/use-session";
+import { useIsMobile } from "shared/hooks/use-is-mobile";
 
 const pageClassName = "mx-auto w-full max-w-[1200px] px-4 pb-16 pt-8 xl:px-0";
 const defaultNetwork: Network = "Ethereum";
 
 const CheckoutPage = () => {
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const { openAuth } = useAuthModal();
   const queryClient = useQueryClient();
@@ -77,6 +81,18 @@ const CheckoutPage = () => {
       );
     },
   });
+  const { mutateAsync: calculateQuote } = quoteMutation;
+  const requestQuote = useCallback(
+    (coupon: string | null, quoteNetwork: Network) => {
+      const request = (pendingQuote.current ?? Promise.resolve())
+        .catch(() => undefined)
+        .then(() => calculateQuote({ coupon, quoteNetwork }));
+      pendingQuote.current = request;
+      void request.catch(() => undefined);
+      return request;
+    },
+    [calculateQuote],
+  );
   const orderMutation = useMutation({
     mutationFn: () => {
       orderKey.current ??= crypto.randomUUID();
@@ -111,21 +127,19 @@ const CheckoutPage = () => {
     const quoteAttempt = `${cart.version}:${network}`;
     if (lastQuoteAttempt.current === quoteAttempt) return;
     lastQuoteAttempt.current = quoteAttempt;
-    pendingQuote.current = quoteMutation.mutateAsync({
-      coupon: currentQuote?.coupon ?? null,
-      quoteNetwork: network,
-    });
-    void pendingQuote.current.catch(() => undefined);
+    void requestQuote(currentQuote?.coupon ?? null, network);
   }, [
     cart?.items.length,
     cart?.version,
     currentQuote?.coupon,
     network,
-    quoteMutation,
+    requestQuote,
   ]);
 
   const availableWallets = (walletsQuery.data ?? []).filter(
-    (wallet) => wallet.connectedState === "connected",
+    (wallet) =>
+      wallet.connectedState === "connected" ||
+      Boolean(session && isWalletConfigured(session.user, wallet)),
   );
   const wallet =
     availableWallets.find((item) => item.isPrimary) ?? availableWallets[0];
@@ -134,6 +148,11 @@ const CheckoutPage = () => {
     walletsQuery.error ??
     orderMutation.error ??
     (couponError ? null : quoteMutation.error);
+  const checkoutError =
+    purchaseError ??
+    (requestError
+      ? `${orderMutation.error ? "Não foi possível confirmar a compra. " : quoteMutation.error ? "Não foi possível atualizar o total. " : ""}${getApiError(requestError).message}`
+      : null);
   const handleConfirm = async () => {
     if (isSubmitting.current) return;
     isSubmitting.current = true;
@@ -141,7 +160,9 @@ const CheckoutPage = () => {
     setIsConfirming(() => true);
     try {
       // Honor a click during recalculation, using its completed quote for the order.
-      await pendingQuote.current;
+      if (quoteMutation.isError)
+        await requestQuote(currentQuote?.coupon ?? null, network);
+      else await pendingQuote.current;
       await orderMutation.mutateAsync();
     } catch {
       // The mutations already expose their errors beside the purchase button.
@@ -158,7 +179,11 @@ const CheckoutPage = () => {
         onClose={() => void navigate({ to: "/" })}
       />
     );
-  if (isSessionLoading || cartQuery.isPending)
+  if (
+    isSessionLoading ||
+    cartQuery.isPending ||
+    (isMobile && session && walletsQuery.isPending)
+  )
     return (
       <main className={pageClassName}>
         <p className="text-sm text-muted-foreground" role="status">
@@ -193,6 +218,24 @@ const CheckoutPage = () => {
           description="Adicione NFTs antes de iniciar o pagamento."
           onAction={() => void navigate({ to: "/cart" })}
           title="Seu carrinho está vazio"
+        />
+      </main>
+    );
+
+  if (isMobile)
+    return (
+      <main className="mx-auto w-full max-w-xl px-6 pb-6 pt-7">
+        <MobileCheckout
+          error={checkoutError}
+          isOrdering={isConfirming}
+          isQuoting={quoteMutation.isPending}
+          onConfirm={() => void handleConfirm()}
+          onNetworkChange={setNetwork}
+          onPaymentMethodChange={setPaymentMethod}
+          paymentMethod={paymentMethod}
+          quote={currentQuote}
+          user={session.user}
+          wallets={availableWallets}
         />
       </main>
     );
@@ -236,19 +279,12 @@ const CheckoutPage = () => {
         />
         <CheckoutSummary
           couponError={couponError}
-          error={
-            purchaseError ??
-            (requestError ? getApiError(requestError).message : null)
-          }
+          error={checkoutError}
           isOrdering={isConfirming}
           isQuoting={quoteMutation.isPending}
           items={cart.items}
           onApplyCoupon={(coupon) => {
-            pendingQuote.current = quoteMutation.mutateAsync({
-              coupon: coupon || null,
-              quoteNetwork: network,
-            });
-            void pendingQuote.current.catch(() => undefined);
+            void requestQuote(coupon || null, network);
           }}
           onPaymentMethodChange={(method) => setPaymentMethod(() => method)}
           paymentMethod={paymentMethod}

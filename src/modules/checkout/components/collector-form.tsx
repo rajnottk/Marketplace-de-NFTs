@@ -5,7 +5,10 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { z } from "zod";
+import {
+  collectorSchema,
+  type CollectorValues,
+} from "modules/checkout/components/collector-values";
 import {
   checkoutRadioClassName,
   ensExtensions,
@@ -16,21 +19,6 @@ import type { Network, User, Wallet } from "shared/contracts/marketplace";
 
 const controlClassName =
   "mt-2 h-10 w-full rounded-sm border border-line bg-transparent px-3 text-sm text-ink placeholder:text-muted-foreground/70 focus-visible:outline-accent aria-[invalid=true]:border-danger";
-const requiredText = z
-  .string({ error: "Este campo precisa ser preenchido." })
-  .trim()
-  .min(1, "Este campo precisa ser preenchido.");
-const collectorSchema = z.object({
-  displayName: requiredText,
-  username: requiredText,
-  profileName: requiredText,
-  walletType: requiredText,
-  address: requiredText,
-  email: requiredText.pipe(z.email("Informe um e-mail válido.")),
-  ensName: z.enum(ensExtensions),
-});
-
-type CollectorValues = z.infer<typeof collectorSchema>;
 
 interface CollectorFieldProps {
   id: string;
@@ -72,7 +60,9 @@ interface CollectorFormProps {
   disabled: boolean;
   isQuoting: boolean;
   onNetworkChange: (network: Network) => void;
-  onConfirm: () => void;
+  onConfirm: (values: CollectorValues) => void;
+  initialValues?: CollectorValues;
+  formId?: string;
 }
 
 const CollectorForm = ({
@@ -83,17 +73,24 @@ const CollectorForm = ({
   isQuoting,
   onNetworkChange,
   onConfirm,
+  initialValues,
+  formId = "collector-form",
 }: CollectorFormProps) => {
   const [useOtherWallet, setUseOtherWallet] = useState(false);
-  const [values, setValues] = useState<CollectorValues>({
-    displayName: user.displayName,
-    username: "",
-    profileName: "",
-    walletType: "",
-    address: wallet?.address ?? "",
-    email: user.email,
-    ensName: ".eth",
-  });
+  const [values, setValues] = useState<CollectorValues>(
+    initialValues ?? {
+      displayName: user.displayName,
+      username: "",
+      profileName: "",
+      walletType: "",
+      address: wallet?.address ?? "",
+      email: user.email,
+      ensName: ".eth",
+      secondaryWallet: "",
+      referralCode: "",
+      collectorNotes: "",
+    },
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -123,7 +120,7 @@ const CollectorForm = ({
       return;
     }
     setErrors(() => ({}));
-    onConfirm();
+    onConfirm(result.data);
   };
 
   const inputProps = (name: keyof CollectorValues) => ({
@@ -146,12 +143,7 @@ const CollectorForm = ({
       <h1 className="text-lg font-bold" id="collector-heading">
         Perfil do colecionador
       </h1>
-      <form
-        className="mt-5"
-        id="collector-form"
-        noValidate
-        onSubmit={handleSubmit}
-      >
+      <form className="mt-5" id={formId} noValidate onSubmit={handleSubmit}>
         <fieldset
           className="grid min-w-0 gap-x-6 gap-y-5 sm:grid-cols-2"
           disabled={disabled}
@@ -209,10 +201,9 @@ const CollectorForm = ({
             label="ENS ou carteira secundária (opcional)"
           >
             <Input
-              className={controlClassName}
-              id="secondaryWallet"
-              name="secondaryWallet"
+              {...inputProps("secondaryWallet")}
               placeholder="ENS ou carteira secundária"
+              required={false}
             />
           </CollectorField>
           <CollectorField
@@ -246,11 +237,7 @@ const CollectorForm = ({
             id="referralCode"
             label="Código de indicação (opcional)"
           >
-            <Input
-              className={controlClassName}
-              id="referralCode"
-              name="referralCode"
-            />
+            <Input {...inputProps("referralCode")} required={false} />
           </CollectorField>
           <CollectorField
             error={errors.email}
@@ -294,10 +281,16 @@ const CollectorForm = ({
             label="Observação do colecionador (opcional)"
           >
             <textarea
+              {...inputProps("collectorNotes")}
               className={`${controlClassName} h-40 resize-none py-3`}
               draggable={false}
-              id="collectorNotes"
-              name="collectorNotes"
+              onChange={(event) =>
+                setValues((previous) => ({
+                  ...previous,
+                  collectorNotes: event.target.value,
+                }))
+              }
+              required={false}
             />
           </CollectorField>
         </fieldset>

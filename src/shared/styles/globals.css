@@ -4,6 +4,29 @@
 @tailwind components;
 @tailwind utilities;
 
+.themed-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #b0916a #241612;
+}
+
+.themed-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.themed-scrollbar::-webkit-scrollbar-track {
+  background: #241612;
+  border-radius: 12px;
+}
+
+.themed-scrollbar::-webkit-scrollbar-thumb {
+  background: #b0916a;
+  border-radius: 12px;
+}
+
+.themed-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #d28a4c;
+}
+
 :root {
   --color-canvas: #160e0a;
   --color-surface: #21130f;

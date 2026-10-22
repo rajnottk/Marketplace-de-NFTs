@@ -126,6 +126,8 @@ export const walletSchema = z.object({
   isPrimary: z.boolean(),
   connectedState: z.enum(["connected", "disconnected", "rejected"]),
   displayName: z.string().optional(),
+  username: z.string().optional(),
+  collectorNotes: z.string().optional(),
   profileName: z.string().optional(),
   walletType: walletTypeSchema.optional(),
   secondaryAddress: z.string().optional(),

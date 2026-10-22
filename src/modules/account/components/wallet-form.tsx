@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useImperativeHandle, useState, type Ref } from "react";
 import { useForm } from "react-hook-form";
+import { LoaderCircle } from "lucide-react";
 import {
   AccountField,
   accountInputClassName,
@@ -89,11 +90,12 @@ const WalletForm = ({
   const mutation = useMutation({
     mutationFn: (values: WalletDetails) =>
       saveWallet({
+        ...wallet,
         ...values,
         id: wallet?.id,
         isPrimary,
         sameAsPrimary: false,
-        connectedState: "disconnected",
+        connectedState: wallet?.connectedState ?? "disconnected",
       }),
     onSuccess: (wallets) => {
       queryClient.setQueryData(queryKeys.wallets, wallets);
@@ -273,11 +275,22 @@ const WalletForm = ({
         </AccountField>
         <div className="sm:col-span-2">
           <Button
-            className="mt-1 h-10 rounded-[3px] px-1 text-sm font-bold"
+            aria-busy={mutation.isPending}
+            className="relative mt-1 h-10 rounded-[3px] px-1 text-sm font-bold"
             disabled={mutation.isPending || disabled}
             type="submit"
           >
-            {mutation.isPending ? "Salvando…" : "Salvar carteira"}
+            <span className={mutation.isPending ? "opacity-0" : ""}>
+              Salvar carteira
+            </span>
+            {mutation.isPending && (
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 grid place-items-center"
+              >
+                <LoaderCircle className="animate-spin" size={18} />
+              </span>
+            )}
           </Button>
         </div>
       </fieldset>

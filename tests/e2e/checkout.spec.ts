@@ -8,7 +8,11 @@ const fillRequiredFields = async (page: Page) => {
   await page.getByRole("option", { name: "MetaMask", exact: true }).click();
 };
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile",
+    "O pagamento mobile possui cobertura própria com configuração em modal.",
+  );
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await openLogin(page);
   await completeCollectorLogin(page);
