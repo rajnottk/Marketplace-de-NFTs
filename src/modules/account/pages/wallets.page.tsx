@@ -1,202 +1,195 @@
-import { useAuthModal } from "modules/auth/hooks/use-auth-modal";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
-import { Plus, WalletCards } from "lucide-react";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import {
+  WalletForm,
+  type WalletFormHandle,
+  type WalletFormValues,
+} from "modules/account/components/wallet-form";
 import { getApiError } from "shared/api/api-error";
-import { getWallets, queryKeys, saveWallet } from "shared/api/marketplace.api";
-import { Button } from "shared/components/ui/button";
-import { Card } from "shared/components/ui/card";
-import { Input } from "shared/components/ui/input";
+import { getWallets, queryKeys } from "shared/api/marketplace.api";
 import { useSession } from "shared/hooks/use-session";
-import type { Network } from "shared/contracts/marketplace";
+
+const secondaryCloseDelayMs = 2_000;
 
 const WalletsPage = () => {
-  const queryClient = useQueryClient();
-  const { openAuth } = useAuthModal();
   const { data: session } = useSession();
   const walletsQuery = useQuery({
     queryKey: queryKeys.wallets,
     queryFn: getWallets,
     enabled: Boolean(session),
   });
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [label, setLabel] = useState("");
-  const [address, setAddress] = useState("");
-  const [network, setNetwork] = useState<Network>("Ethereum");
-  const saveMutation = useMutation({
-    mutationFn: () =>
-      saveWallet({
-        label,
-        address,
-        network,
-        isPrimary: !walletsQuery.data?.length,
-        connectedState: "connected",
-      }),
-    onSuccess: (wallets) => {
-      queryClient.setQueryData(queryKeys.wallets, wallets);
-      setIsFormOpen(false);
-      setLabel("");
-      setAddress("");
+  const [isNewPrimary, setIsNewPrimary] = useState(false);
+  const [isSecondaryOpen, setIsSecondaryOpen] = useState(false);
+  const [shouldCopyPrimary, setShouldCopyPrimary] = useState(false);
+  const [secondaryDefaults, setSecondaryDefaults] =
+    useState<Partial<WalletFormValues>>();
+  const [secondaryFormVersion, setSecondaryFormVersion] = useState(0);
+  const [isSecondaryClosing, setIsSecondaryClosing] = useState(false);
+  const secondaryFormRef = useRef<WalletFormHandle>(null);
+  const previousDefaultsRef = useRef<Partial<WalletFormValues> | undefined>(
+    undefined,
+  );
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
     },
-  });
-  const error = walletsQuery.error
-    ? getApiError(walletsQuery.error)
-    : saveMutation.error
-      ? getApiError(saveMutation.error)
-      : null;
-  if (!session)
+    [],
+  );
+  const primary =
+    walletsQuery.data?.find((wallet) => wallet.isPrimary) ??
+    walletsQuery.data?.[0];
+  const secondary = walletsQuery.data?.find(
+    (wallet) => !wallet.isPrimary && wallet.id !== primary?.id,
+  );
+  const clearCloseTimer = () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = null;
+    setIsSecondaryClosing(() => false);
+  };
+  const closeSecondaryForm = () => {
+    clearCloseTimer();
+    setIsSecondaryOpen(() => false);
+    setShouldCopyPrimary(() => false);
+    setSecondaryDefaults(() => undefined);
+    previousDefaultsRef.current = undefined;
+  };
+  const toggleCopyPrimary = () => {
+    if (!primary) return;
+    clearCloseTimer();
+    if (shouldCopyPrimary) {
+      setShouldCopyPrimary(() => false);
+      setSecondaryDefaults(() => previousDefaultsRef.current);
+      setIsSecondaryOpen(() => false);
+      return;
+    }
+    previousDefaultsRef.current =
+      secondaryFormRef.current?.getValues() ?? secondaryDefaults;
+    const defaults: Partial<WalletFormValues> = {
+      displayName: primary.displayName ?? session?.user.displayName ?? "",
+      network: primary.network,
+      walletType: primary.walletType ?? "",
+      email: primary.email ?? session?.user.email ?? "",
+      ensName: primary.ensName ?? session?.user.ensName ?? "",
+      ensSuffix: primary.ensSuffix ?? session?.user.ensSuffix ?? ".eth",
+      profileName: primary.profileName ?? session?.user.username ?? "",
+      label: "",
+      address: "",
+      secondaryAddress: "",
+      referralCode: "",
+    };
+    setSecondaryDefaults(() => defaults);
+    setSecondaryFormVersion((previous) => previous + 1);
+    setShouldCopyPrimary(() => true);
+    setIsSecondaryOpen(() => true);
+  };
+  const toggleSecondaryForm = () => {
+    if (isSecondaryOpen) {
+      closeSecondaryForm();
+      return;
+    }
+    setIsSecondaryOpen(() => true);
+  };
+  const handleSecondarySaved = () => {
+    clearCloseTimer();
+    setIsSecondaryClosing(() => true);
+    closeTimerRef.current = setTimeout(
+      closeSecondaryForm,
+      secondaryCloseDelayMs,
+    );
+  };
+  if (!session) return null;
+  if (walletsQuery.isPending)
     return (
-      <main className="mx-auto max-w-5xl px-4 py-10">
-        <Card className="p-6 text-center">
-          <p className="text-muted">Entre para gerenciar carteiras.</p>
-          <button
-            className="mt-4 inline-block text-accent underline"
-            onClick={() => openAuth()}
-            type="button"
-          >
-            Ir para login
-          </button>
-        </Card>
-      </main>
+      <p className="text-sm text-[#CFB28C]" role="status">
+        Carregando carteiras…
+      </p>
+    );
+  if (walletsQuery.error)
+    return (
+      <p className="text-sm text-danger" role="alert">
+        {getApiError(walletsQuery.error).message}
+      </p>
     );
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:py-12">
-      <p className="text-xs uppercase tracking-[0.2em] text-accent">
-        Minha conta
-      </p>
-      <h1 className="mt-2 font-display text-3xl font-bold">CARTEIRAS</h1>
-      <section className="mt-8 grid gap-6 md:grid-cols-[13rem_minmax(0,1fr)]">
-        <nav
-          aria-label="Configurações da conta"
-          className="h-fit rounded-kurio border border-line bg-surface p-3 text-sm"
-        >
-          <Link
-            className="block rounded px-3 py-2 text-muted hover:text-ink"
-            to="/account/profile"
-          >
-            Dados do perfil
-          </Link>
-          <Link
-            className="block rounded px-3 py-2 text-accent"
-            to="/account/wallets"
-          >
-            Carteiras
-          </Link>
-        </nav>
-        <div className="space-y-4">
-          {walletsQuery.data?.map((wallet) => (
-            <Card className="flex items-center gap-4 p-5" key={wallet.id}>
-              <WalletCards
-                aria-hidden="true"
-                className="text-accent"
-                size={24}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="font-display text-sm font-bold">
-                  {wallet.label}{" "}
-                  {wallet.isPrimary ? (
-                    <span className="ml-2 text-[10px] text-accent">
-                      PRINCIPAL
-                    </span>
-                  ) : null}
-                </p>
-                <p className="mt-1 text-xs text-muted">
-                  {wallet.address} · {wallet.network}
-                </p>
-              </div>
-              <span className="text-xs text-accent">
-                {wallet.connectedState === "connected"
-                  ? "Conectada"
-                  : "Desconectada"}
-              </span>
-            </Card>
-          ))}
-          {isFormOpen ? (
-            <Card className="space-y-4 p-5">
-              <h2 className="font-display text-base font-bold">
-                NOVA CARTEIRA
-              </h2>
-              <label
-                className="block text-xs text-muted"
-                htmlFor="wallet-label"
-              >
-                Identificação
-                <Input
-                  className="mt-2"
-                  id="wallet-label"
-                  onChange={(event) => setLabel(event.target.value)}
-                  placeholder="Ex.: Ledger pessoal"
-                  value={label}
-                />
-              </label>
-              <label
-                className="block text-xs text-muted"
-                htmlFor="wallet-address"
-              >
-                Endereço
-                <Input
-                  className="mt-2"
-                  id="wallet-address"
-                  onChange={(event) => setAddress(event.target.value)}
-                  placeholder="0x..."
-                  value={address}
-                />
-              </label>
-              <label
-                className="block text-xs text-muted"
-                htmlFor="wallet-network"
-              >
-                Rede
-                <select
-                  className="mt-2 h-11 w-full rounded-kurio border border-line bg-surface px-3 text-ink"
-                  id="wallet-network"
-                  onChange={(event) =>
-                    setNetwork(event.target.value as Network)
-                  }
-                  value={network}
-                >
-                  <option>Ethereum</option>
-                  <option>Polygon</option>
-                  <option>Solana</option>
-                </select>
-              </label>
-              <div className="flex gap-2">
-                <Button
-                  disabled={
-                    !label.trim() || !address.trim() || saveMutation.isPending
-                  }
-                  onClick={() => saveMutation.mutate()}
-                >
-                  Salvar carteira
-                </Button>
-                <Button
-                  onClick={() => setIsFormOpen(false)}
-                  variant="secondary"
-                >
-                  Cancelar
-                </Button>
-              </div>
-            </Card>
-          ) : (
-            <Button
-              className="w-full"
-              onClick={() => setIsFormOpen(true)}
-              variant="secondary"
-            >
-              <Plus size={17} />
-              Adicionar carteira
-            </Button>
-          )}
-          {error ? (
-            <p className="text-xs text-danger" role="alert">
-              {error.message}
-            </p>
-          ) : null}
+    <>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-base font-bold">Carteira principal</h1>
+          <p className="mt-1 text-sm leading-5 text-[#CFB28C]">
+            Estas carteiras ficam disponíveis no pagamento e para receber NFTs
+            comprados.
+          </p>
         </div>
+        <button
+          className="shrink-0 text-sm text-accent hover:text-primary"
+          onClick={() => setIsNewPrimary(() => true)}
+          type="button"
+        >
+          Adicionar
+        </button>
+      </div>
+      <WalletForm
+        isPrimary
+        key={isNewPrimary ? "new-primary" : (primary?.id ?? "primary")}
+        onSaved={() => setIsNewPrimary(() => false)}
+        user={session.user}
+        wallet={isNewPrimary ? undefined : primary}
+      />
+      <section aria-label="Carteira secundária" className="mt-7">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-base font-bold">Carteira secundária</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                checked={shouldCopyPrimary}
+                className="size-4 cursor-pointer appearance-none rounded-full border border-primary checked:bg-primary checked:shadow-[inset_0_0_0_3px_var(--color-canvas)] disabled:cursor-default disabled:opacity-50"
+                disabled={!primary}
+                name="same-as-primary"
+                onChange={() => undefined}
+                onClick={toggleCopyPrimary}
+                type="radio"
+              />
+              Igual à carteira principal
+            </label>
+            <button
+              className="text-sm text-accent hover:text-primary"
+              onClick={toggleSecondaryForm}
+              type="button"
+            >
+              {isSecondaryOpen
+                ? "Cancelar"
+                : secondary
+                  ? "Alterar"
+                  : "Adicionar"}
+            </button>
+          </div>
+        </div>
+        {!secondary && !isSecondaryOpen && (
+          <p className="mt-1 text-sm leading-5 text-[#CFB28C]">
+            Você ainda não adicionou uma carteira secundária.
+          </p>
+        )}
+        {secondary && !isSecondaryOpen && (
+          <p className="mt-2 break-all text-sm leading-5 text-[#CFB28C]">
+            {secondary.label} · {secondary.network} · {secondary.address}
+          </p>
+        )}
+        {isSecondaryOpen && (
+          <WalletForm
+            disabled={isSecondaryClosing}
+            formRef={secondaryFormRef}
+            initialValues={secondaryDefaults}
+            isPrimary={false}
+            key={secondaryFormVersion}
+            onSaved={handleSecondarySaved}
+            user={session.user}
+            wallet={secondary}
+          />
+        )}
       </section>
-    </main>
+    </>
   );
 };
 

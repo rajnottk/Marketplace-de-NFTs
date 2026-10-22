@@ -8,10 +8,12 @@ import type {
   Nft,
   Order,
   Post,
+  ProfileUpdate,
   Quote,
   Session,
   User,
   Wallet,
+  WalletInput,
 } from "shared/contracts/marketplace";
 
 export const queryKeys = {
@@ -152,8 +154,8 @@ export const getProfile = async () => {
   return response.data;
 };
 
-export const updateProfile = async (displayName: string) => {
-  const response = await apiClient.patch<User>("/profile", { displayName });
+export const updateProfile = async (profile: ProfileUpdate) => {
+  const response = await apiClient.patch<User>("/profile", profile);
   return response.data;
 };
 
@@ -167,7 +169,9 @@ export const getWallets = async () => {
   return response.data;
 };
 
-export const saveWallet = async (wallet: Omit<Wallet, "id">) => {
-  const response = await apiClient.post<Wallet[]>("/wallets", wallet);
+export const saveWallet = async ({ id, ...wallet }: WalletInput) => {
+  const response = id
+    ? await apiClient.patch<Wallet[]>(`/wallets/${id}`, wallet)
+    : await apiClient.post<Wallet[]>("/wallets", wallet);
   return response.data;
 };

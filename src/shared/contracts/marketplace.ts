@@ -60,10 +60,51 @@ export const userSchema = z.object({
   id: z.string(),
   displayName: z.string(),
   email: z.string().email(),
-  avatarUrl: z.string().min(1),
+  avatarUrl: z.string(),
+  username: z.string().optional(),
+  ensName: z.string().optional(),
+  ensSuffix: z.enum([".eth", ".xyz", ".com", ".org"]).optional(),
+  walletAlias: z.string().optional(),
   sessionVersion: z.number().int().positive(),
 });
 export type User = z.infer<typeof userSchema>;
+
+const profileRequiredText = z
+  .string()
+  .trim()
+  .min(1, "Este campo precisa ser preenchido.");
+export const profileUpdateSchema = z.object({
+  displayName: profileRequiredText.pipe(
+    z.string().min(2, "Use pelo menos dois caracteres."),
+  ),
+  username: profileRequiredText.pipe(
+    z
+      .string()
+      .regex(
+        /^[\p{L}\p{N}_.-]+$/u,
+        "Use letras, números, ponto, hífen ou sublinhado.",
+      ),
+  ),
+  email: profileRequiredText.pipe(z.email("Informe um e-mail válido.")),
+  ensName: profileRequiredText,
+  ensSuffix: z.enum([".eth", ".xyz", ".com", ".org"]),
+  walletAlias: profileRequiredText,
+  avatarUrl: z
+    .string()
+    .refine(
+      (url) =>
+        !url ||
+        /^(https?:\/\/|\/|data:image\/(png|jpeg|webp);base64,)/i.test(url),
+      "Selecione uma imagem válida.",
+    ),
+  passwordChange: z
+    .object({
+      currentPassword: z.string().min(1),
+      nextPassword: z.string().min(8),
+    })
+    .optional(),
+});
+export type ProfileUpdate = z.infer<typeof profileUpdateSchema>;
 
 export const sessionSchema = z.object({
   user: userSchema,
@@ -71,6 +112,12 @@ export const sessionSchema = z.object({
 });
 export type Session = z.infer<typeof sessionSchema>;
 
+export const walletTypeSchema = z.enum([
+  "MetaMask",
+  "WalletConnect",
+  "Coinbase Wallet",
+  "Outra carteira",
+]);
 export const walletSchema = z.object({
   id: z.string(),
   label: z.string(),
@@ -78,8 +125,39 @@ export const walletSchema = z.object({
   network: networkSchema,
   isPrimary: z.boolean(),
   connectedState: z.enum(["connected", "disconnected", "rejected"]),
+  displayName: z.string().optional(),
+  profileName: z.string().optional(),
+  walletType: walletTypeSchema.optional(),
+  secondaryAddress: z.string().optional(),
+  referralCode: z.string().optional(),
+  email: z.string().email().optional(),
+  ensName: z.string().optional(),
+  ensSuffix: z.enum([".eth", ".xyz", ".com", ".org"]).optional(),
+  sameAsPrimary: z.boolean().optional(),
 });
 export type Wallet = z.infer<typeof walletSchema>;
+export type WalletInput = Omit<Wallet, "id"> & { id?: string };
+
+export const walletDetailsSchema = walletSchema
+  .omit({
+    id: true,
+    isPrimary: true,
+    connectedState: true,
+    sameAsPrimary: true,
+  })
+  .extend({
+    label: profileRequiredText,
+    address: profileRequiredText,
+    displayName: profileRequiredText,
+    profileName: profileRequiredText,
+    walletType: walletTypeSchema,
+    secondaryAddress: z.string().trim(),
+    referralCode: profileRequiredText,
+    email: profileRequiredText.pipe(z.email("Informe um e-mail válido.")),
+    ensName: profileRequiredText,
+    ensSuffix: z.enum([".eth", ".xyz", ".com", ".org"]),
+  });
+export type WalletDetails = z.infer<typeof walletDetailsSchema>;
 
 export const cartItemSchema = z.object({
   id: z.string(),

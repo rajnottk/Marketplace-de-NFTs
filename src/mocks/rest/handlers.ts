@@ -29,6 +29,7 @@ import {
 import {
   networkSchema,
   newsletterSubscriptionSchema,
+  profileUpdateSchema,
   walletSchema,
 } from "shared/contracts/marketplace";
 import { verifyFirebaseToken } from "mocks/auth/verify-firebase-token";
@@ -64,7 +65,6 @@ const quoteSchema = z.object({
   coupon: z.string().nullable(),
   network: networkSchema,
 });
-const profileSchema = z.object({ displayName: z.string().min(2) });
 const passwordSchema = z.object({
   currentPassword: z.string().min(1),
   nextPassword: z.string().min(8),
@@ -320,15 +320,24 @@ export const handlers = [
 
   http.patch("/api/profile", async ({ request }) => {
     await waitForMockNetwork();
-    const parsed = profileSchema.safeParse(await request.json());
+    const parsed = profileUpdateSchema.safeParse(await request.json());
     if (!parsed.success)
-      return apiError("VALIDATION_ERROR", "Nome inválido.", 422);
-    const user = updateProfile(
-      getSessionToken(request),
-      parsed.data.displayName,
-    );
+      return apiError("VALIDATION_ERROR", "Confira os dados do perfil.", 422);
+    const user = updateProfile(getSessionToken(request), parsed.data);
     if (user === "unauthorized")
       return apiError("UNAUTHORIZED", "Sua sessão expirou.", 401);
+    if (user === "conflict")
+      return apiError("CONFLICT", "Este e-mail já está em uso.", 409, {
+        email: "Este e-mail já está em uso.",
+      });
+    if (user === "username-conflict")
+      return apiError("CONFLICT", "Este nome de usuário já está em uso.", 409, {
+        username: "Este nome de usuário já está em uso.",
+      });
+    if (user === "invalid-password")
+      return apiError("VALIDATION_ERROR", "A senha atual não confere.", 422, {
+        currentPassword: "A senha atual não confere.",
+      });
     return HttpResponse.json(user);
   }),
 
@@ -372,6 +381,25 @@ export const handlers = [
     const wallets = saveWallet(getSessionToken(request), parsed.data);
     if (wallets === "unauthorized")
       return apiError("UNAUTHORIZED", "Entre para salvar uma carteira.", 401);
+    if (wallets === "not-found")
+      return apiError("NOT_FOUND", "Carteira não encontrada.", 404);
     return HttpResponse.json(wallets, { status: 201 });
+  }),
+  http.patch("/api/wallets/:walletId", async ({ request, params }) => {
+    await waitForMockNetwork();
+    const parsed = walletSchema
+      .omit({ id: true })
+      .safeParse(await request.json());
+    if (!parsed.success)
+      return apiError("VALIDATION_ERROR", "Dados da carteira inválidos.", 422);
+    const wallets = saveWallet(getSessionToken(request), {
+      ...parsed.data,
+      id: String(params.walletId),
+    });
+    if (wallets === "unauthorized")
+      return apiError("UNAUTHORIZED", "Entre para salvar uma carteira.", 401);
+    if (wallets === "not-found")
+      return apiError("NOT_FOUND", "Carteira não encontrada.", 404);
+    return HttpResponse.json(wallets);
   }),
 ];

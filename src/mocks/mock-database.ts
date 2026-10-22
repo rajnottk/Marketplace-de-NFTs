@@ -6,10 +6,12 @@ import type {
   Network,
   Nft,
   Order,
+  ProfileUpdate,
   Quote,
   Session,
   User,
   Wallet,
+  WalletInput,
 } from "shared/contracts/marketplace";
 import {
   cartSchema,
@@ -57,6 +59,10 @@ const hashPassword = (password: string) =>
 const defaultUser: MockUser = {
   id: "collector-ana",
   displayName: "Ana Coleciona",
+  username: "ana.coleciona",
+  ensName: "ana",
+  ensSuffix: ".eth",
+  walletAlias: "Carteira principal",
   email: "collector@kurio.test",
   passwordHash: hashPassword("Kurio#2026"),
   avatarUrl: apeGreenJacketImage,
@@ -126,6 +132,10 @@ const toPublicUser = (user: MockUser): User => ({
   displayName: user.displayName,
   email: user.email,
   avatarUrl: user.avatarUrl,
+  username: user.username ?? user.email.split("@")[0],
+  ensName: user.ensName ?? "",
+  ensSuffix: user.ensSuffix ?? ".eth",
+  walletAlias: user.walletAlias ?? "Carteira principal",
   sessionVersion: user.sessionVersion,
 });
 
@@ -532,22 +542,31 @@ export const getWallets = (sessionToken: string | null) =>
 
 export const saveWallet = (
   sessionToken: string | null,
-  wallet: Omit<Wallet, "id">,
+  wallet: WalletInput,
 ) => {
   const owner = getOwner(sessionToken);
   const user = getUserById(owner);
   if (!user) return "unauthorized";
   const wallets = getWallets(sessionToken);
-  const nextWallet: Wallet = { ...wallet, id: `wallet-${crypto.randomUUID()}` };
-  const normalizedWallets = wallet.isPrimary
-    ? [
-        ...wallets.map((storedWallet) => ({
-          ...storedWallet,
-          isPrimary: false,
-        })),
-        nextWallet,
-      ]
-    : [...wallets, nextWallet];
+  if (
+    wallet.id &&
+    !wallets.some((storedWallet) => storedWallet.id === wallet.id)
+  )
+    return "not-found";
+  const nextWallet: Wallet = {
+    ...wallet,
+    id: wallet.id ?? `wallet-${crypto.randomUUID()}`,
+  };
+  const remainingWallets = wallets.filter(
+    (storedWallet) => storedWallet.id !== nextWallet.id,
+  );
+  const normalizedWallets = [
+    ...remainingWallets.map((storedWallet) => {
+      if (!wallet.isPrimary) return storedWallet;
+      return { ...storedWallet, isPrimary: false };
+    }),
+    nextWallet,
+  ];
   commitState({
     ...state,
     wallets: { ...state.wallets, [owner]: normalizedWallets },
@@ -590,12 +609,40 @@ export const getOrder = (orderId: string) => state.orders[orderId] ?? null;
 
 export const updateProfile = (
   sessionToken: string | null,
-  displayName: string,
+  profile: ProfileUpdate,
 ) => {
   const owner = getOwner(sessionToken);
   const user = getUserById(owner);
   if (!user) return "unauthorized";
-  const updatedUser = { ...user, displayName };
+  if (
+    state.users.some(
+      (candidate) =>
+        candidate.id !== owner &&
+        candidate.email.toLowerCase() === profile.email.toLowerCase(),
+    )
+  )
+    return "conflict";
+  if (
+    state.users.some(
+      (candidate) =>
+        candidate.id !== owner &&
+        candidate.username?.toLowerCase() === profile.username.toLowerCase(),
+    )
+  )
+    return "username-conflict";
+  const { passwordChange, ...details } = profile;
+  if (
+    passwordChange &&
+    user.passwordHash !== hashPassword(passwordChange.currentPassword)
+  )
+    return "invalid-password";
+  const updatedUser = {
+    ...user,
+    ...details,
+    ...(passwordChange
+      ? { passwordHash: hashPassword(passwordChange.nextPassword) }
+      : {}),
+  };
   commitState({
     ...state,
     users: state.users.map((candidate) =>

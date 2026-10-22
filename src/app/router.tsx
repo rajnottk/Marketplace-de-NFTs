@@ -2,10 +2,13 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  redirect,
 } from "@tanstack/react-router";
 import { AppLayout } from "app/app-layout";
 import { ProfilePage } from "modules/account/pages/profile.page";
 import { WalletsPage } from "modules/account/pages/wallets.page";
+import { AccountConstructionPage } from "modules/account/pages/account-construction.page";
+import { AccountLayout } from "modules/account/components/account-layout";
 import { CartPage } from "modules/cart/pages/cart.page";
 import { CatalogPage } from "modules/catalog/pages/catalog.page";
 import { CheckoutPage } from "modules/checkout/pages/checkout.page";
@@ -53,9 +56,14 @@ const checkoutRoute = createRoute({
   path: "/checkout",
   component: CheckoutPage,
 });
-const profileRoute = createRoute({
+const accountRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/account/profile",
+  path: "/account",
+  component: AccountLayout,
+});
+const profileRoute = createRoute({
+  getParentRoute: () => accountRoute,
+  path: "/profile",
   component: ProfilePage,
 });
 const creatorsRoute = createRoute({
@@ -79,9 +87,41 @@ const collectionRoute = createRoute({
   component: () => <UnderConstructionPage title="Coleções" />,
 });
 const walletsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/account/wallets",
+  getParentRoute: () => accountRoute,
+  path: "/wallet",
   component: WalletsPage,
+});
+const legacyWalletsRoute = createRoute({
+  getParentRoute: () => accountRoute,
+  path: "/wallets",
+  beforeLoad: () => {
+    throw redirect({ to: "/account/wallet", replace: true });
+  },
+});
+const activityRoute = createRoute({
+  getParentRoute: () => accountRoute,
+  path: "/activity",
+  component: () => <AccountConstructionPage title="Atividade" />,
+});
+const wishlistRoute = createRoute({
+  getParentRoute: () => accountRoute,
+  path: "/wishlist",
+  component: () => <AccountConstructionPage title="Lista de interesse" />,
+});
+const offersRoute = createRoute({
+  getParentRoute: () => accountRoute,
+  path: "/offers",
+  component: () => <AccountConstructionPage title="Ofertas" />,
+});
+const downloadsRoute = createRoute({
+  getParentRoute: () => accountRoute,
+  path: "/downloads",
+  component: () => <AccountConstructionPage title="Arquivos baixados" />,
+});
+const supportRoute = createRoute({
+  getParentRoute: () => accountRoute,
+  path: "/support",
+  component: () => <AccountConstructionPage title="Suporte" />,
 });
 
 const routeTree = rootRoute.addChildren([
@@ -89,8 +129,16 @@ const routeTree = rootRoute.addChildren([
   nftDetailRoute,
   cartRoute,
   checkoutRoute,
-  profileRoute,
-  walletsRoute,
+  accountRoute.addChildren([
+    profileRoute,
+    walletsRoute,
+    legacyWalletsRoute,
+    activityRoute,
+    wishlistRoute,
+    offersRoute,
+    downloadsRoute,
+    supportRoute,
+  ]),
   creatorsRoute,
   learnRoute,
   helpRoute,

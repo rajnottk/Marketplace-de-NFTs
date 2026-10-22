@@ -1,17 +1,11 @@
 import { useMemo } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LogIn, Menu, Search, ShoppingCart } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { LogIn, Menu, Search, ShoppingCart, UserRound } from "lucide-react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import {
-  getCart,
-  getCatalog,
-  logout,
-  queryKeys,
-} from "shared/api/marketplace.api";
+import { getCart, getCatalog, queryKeys } from "shared/api/marketplace.api";
 import { Button } from "shared/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "shared/components/ui/tabs";
 import { useSession } from "shared/hooks/use-session";
-import { clearSessionToken } from "shared/lib/session";
 import { useAuthModal } from "modules/auth/hooks/use-auth-modal";
 
 type NavigationTab = "home" | "market" | "creators" | "learn";
@@ -27,7 +21,7 @@ const navigationTabClassName =
   "h-full flex-none px-0 text-base font-normal text-ink hover:text-accent data-[active]:text-accent after:!bottom-0 after:!h-[3px] after:rounded-t-sm after:bg-accent";
 
 const getActiveTab = (currentPath: string): NavigationTab | null => {
-  if (currentPath === "/") return "home";
+  if (currentPath === "/" || currentPath.startsWith("/account/")) return "home";
   // NFT details, cart and checkout all belong to the "Mercado" section.
   if (
     currentPath.startsWith("/nfts/") ||
@@ -42,7 +36,6 @@ const getActiveTab = (currentPath: string): NavigationTab | null => {
 };
 
 const AppHeader = () => {
-  const queryClient = useQueryClient();
   const { openAuth } = useAuthModal();
   const currentPath = useRouterState({
     select: (state) => state.location.pathname,
@@ -55,17 +48,6 @@ const AppHeader = () => {
   const { data: marketCatalog } = useQuery({
     queryKey: queryKeys.catalog(marketSearch),
     queryFn: () => getCatalog(marketSearch),
-  });
-  const logoutMutation = useMutation({
-    mutationFn: logout,
-    onSuccess: () => {
-      clearSessionToken();
-      queryClient.removeQueries({ queryKey: queryKeys.session });
-      queryClient.removeQueries({ queryKey: queryKeys.favorites });
-      queryClient.removeQueries({ queryKey: queryKeys.wallets });
-      queryClient.removeQueries({ queryKey: queryKeys.profile });
-      queryClient.invalidateQueries({ queryKey: queryKeys.cart });
-    },
   });
 
   const cartItemCount =
@@ -150,27 +132,21 @@ const AppHeader = () => {
             ) : null}
           </Link>
           {session ? (
-            <div className="flex items-center gap-2">
-              <Link
-                aria-label={`Perfil de ${session.user.displayName}`}
-                className="text-sm text-ink hover:text-accent"
-                to="/account/profile"
-              >
-                <span className="sm:hidden">Perfil</span>
-                <span className="hidden sm:inline">
-                  {session.user.displayName}
-                </span>
-              </Link>
-              <Button
-                className="hidden sm:inline-flex"
-                disabled={logoutMutation.isPending}
-                onClick={() => logoutMutation.mutate()}
-                size="sm"
-                variant="secondary"
-              >
-                Sair
-              </Button>
-            </div>
+            <Link
+              aria-label={`Perfil de ${session.user.displayName}`}
+              className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border border-line text-accent hover:border-primary"
+              to="/account/profile"
+            >
+              {session.user.avatarUrl ? (
+                <img
+                  alt={`Avatar de ${session.user.displayName}`}
+                  className="size-full object-cover"
+                  src={session.user.avatarUrl}
+                />
+              ) : (
+                <UserRound aria-hidden="true" size={22} strokeWidth={1.5} />
+              )}
+            </Link>
           ) : (
             <Button
               className="h-9 bg-[#D28A4C] px-4 text-base font-medium text-[#140D0A] shadow-none hover:bg-[#D28A4C]/90 [&_svg]:size-5"

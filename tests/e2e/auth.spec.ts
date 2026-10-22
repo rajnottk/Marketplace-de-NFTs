@@ -110,7 +110,7 @@ test("cadastra com confirmação de senha visível e leva ao perfil", async ({
   await expect(page).toHaveURL("/account/profile");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(
-    page.getByRole("heading", { name: "PERFIL DO COLECIONADOR" }),
+    page.getByRole("heading", { name: /perfil do colecionador/i }),
   ).toBeVisible();
   await expect(page.getByLabel("Perfil de Lia Coleciona")).toBeVisible();
   await expect(
