@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { completeCollectorLogin } from "../helpers/auth";
+import { completeCollectorLogin, openLogin } from "../helpers/auth";
 
 const fillRequiredFields = async (page: Page) => {
   await page.getByLabel("Nome de usuário").fill("ana-coleciona");
@@ -10,10 +10,7 @@ const fillRequiredFields = async (page: Page) => {
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
-  await page
-    .getByRole("banner")
-    .getByRole("button", { name: "Entrar", exact: true })
-    .click();
+  await openLogin(page);
   await completeCollectorLogin(page);
   await page.goto("/nfts/emerald-ape-042");
   await page.getByRole("button", { name: "Comprar" }).click();

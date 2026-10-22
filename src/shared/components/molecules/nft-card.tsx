@@ -12,10 +12,10 @@ const nftCardSizeClassNames: Record<
   { root: string; imageBlock: string; name: string; price: string }
 > = {
   default: {
-    root: "w-full",
-    imageBlock: "p-2 py-10",
-    name: "mt-4 text-lg",
-    price: "mt-1 text-xl",
+    root: "w-full min-w-0",
+    imageBlock: "rounded-2xl p-2 py-3 sm:rounded-none sm:py-10",
+    name: "mt-2 text-sm sm:mt-4 sm:text-lg",
+    price: "mt-1 text-sm sm:text-xl",
   },
   compact: {
     root: "h-[303px] w-[220px]",

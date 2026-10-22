@@ -66,7 +66,7 @@ const WalletsPage = () => {
     previousDefaultsRef.current =
       secondaryFormRef.current?.getValues() ?? secondaryDefaults;
     const defaults: Partial<WalletFormValues> = {
-      displayName: primary.displayName ?? session?.user.displayName ?? "",
+      displayName: "",
       network: primary.network,
       walletType: primary.walletType ?? "",
       email: primary.email ?? session?.user.email ?? "",

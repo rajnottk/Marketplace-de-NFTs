@@ -86,6 +86,11 @@ const collectionRoute = createRoute({
   path: "/collection",
   component: () => <UnderConstructionPage title="Coleções" />,
 });
+const favoritesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/favorites",
+  component: () => <UnderConstructionPage title="Favoritos" />,
+});
 const walletsRoute = createRoute({
   getParentRoute: () => accountRoute,
   path: "/wallet",
@@ -143,6 +148,7 @@ const routeTree = rootRoute.addChildren([
   learnRoute,
   helpRoute,
   collectionRoute,
+  favoritesRoute,
 ]);
 
 export const router = createRouter({ routeTree });

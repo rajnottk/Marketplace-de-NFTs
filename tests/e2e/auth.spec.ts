@@ -1,15 +1,16 @@
 import { expect, test } from "@playwright/test";
-import { completeCollectorLogin } from "../helpers/auth";
+import {
+  completeCollectorLogin,
+  openLogin,
+  expectLoggedOut,
+} from "../helpers/auth";
 
 test("abre e fecha o modal em qualquer página sem trocar a rota", async ({
   page,
 }, testInfo) => {
   for (const path of ["/", "/nfts/emerald-ape-042", "/account/profile"]) {
     await page.goto(path);
-    await page
-      .getByRole("banner")
-      .getByRole("button", { name: "Entrar", exact: true })
-      .click();
+    await openLogin(page);
     const modal = page.getByRole("dialog", { name: "Entrar na Kurio" });
     await expect(modal).toBeVisible();
     await expect(page).toHaveURL(path);
@@ -45,10 +46,7 @@ test("cadastra com confirmação de senha visível e leva ao perfil", async ({
   await expect(
     page.getByRole("link", { name: "Carrinho com 1 itens" }),
   ).toBeVisible();
-  await page
-    .getByRole("banner")
-    .getByRole("button", { name: "Entrar", exact: true })
-    .click();
+  await openLogin(page);
   await page.getByRole("tab", { name: "Criar conta", exact: true }).click();
   const modal = page.getByRole("dialog", { name: "Criar conta", exact: true });
   await modal
@@ -122,10 +120,7 @@ test("recupera senha apenas visualmente e permite voltar pela aba Entrar", async
   page,
 }, testInfo) => {
   await page.goto("/");
-  await page
-    .getByRole("banner")
-    .getByRole("button", { name: "Entrar", exact: true })
-    .click();
+  await openLogin(page);
   const authRequests: string[] = [];
   page.on("request", (request) => {
     if (request.url().includes("/api/auth/")) authRequests.push(request.url());
@@ -169,10 +164,7 @@ test("mostra erros de acesso sem fechar o modal ou simular login social", async 
   page,
 }) => {
   await page.goto("/");
-  await page
-    .getByRole("banner")
-    .getByRole("button", { name: "Entrar", exact: true })
-    .click();
+  await openLogin(page);
   const modal = page.getByRole("dialog", { name: "Entrar na Kurio" });
   await modal.getByRole("button", { name: "Entrar", exact: true }).click();
   await expect(modal.getByRole("alert")).toHaveCount(2);
@@ -192,11 +184,7 @@ test("mostra erros de acesso sem fechar o modal ou simular login social", async 
   }
   await expect(modal).toBeVisible();
   await modal.getByRole("button", { name: "Fechar autenticação" }).click();
-  await expect(
-    page
-      .getByRole("banner")
-      .getByRole("button", { name: "Entrar", exact: true }),
-  ).toBeVisible();
+  await expectLoggedOut(page);
 });
 
 test("a ponte social rejeita um token não verificado", async ({ page }) => {
@@ -210,9 +198,5 @@ test("a ponte social rejeita um token não verificado", async ({ page }) => {
     return response.status;
   });
   expect(status).toBe(401);
-  await expect(
-    page
-      .getByRole("banner")
-      .getByRole("button", { name: "Entrar", exact: true }),
-  ).toBeVisible();
+  await expectLoggedOut(page);
 });

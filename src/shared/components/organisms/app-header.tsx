@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { LogIn, Menu, Search, ShoppingCart, UserRound } from "lucide-react";
+import { CatalogSearchInput } from "modules/catalog/components/catalog-search";
+import { CatalogFilterTrigger } from "modules/catalog/components/catalog-filter-trigger";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { getCart, getCatalog, queryKeys } from "shared/api/marketplace.api";
 import { Button } from "shared/components/ui/button";
@@ -37,6 +39,7 @@ const getActiveTab = (currentPath: string): NavigationTab | null => {
 
 const AppHeader = () => {
   const { openAuth } = useAuthModal();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const currentPath = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -53,6 +56,7 @@ const AppHeader = () => {
   const cartItemCount =
     cart?.items.reduce((total, item) => total + item.quantity, 0) ?? 0;
   const activeTab = getActiveTab(currentPath);
+  const isHome = currentPath === "/";
 
   // Picks a new NFT on every route change so "Mercado" always opens a random item.
   const randomNftId = useMemo(() => {
@@ -64,7 +68,15 @@ const AppHeader = () => {
 
   return (
     <header className="sticky top-0 z-30 bg-[#140D0A] font-mono">
-      <div className="mx-auto flex h-[68px] w-full max-w-[1200px] items-center justify-between gap-4 border-b-[0.3px] border-primary px-4 xl:px-0">
+      {isHome && (
+        <div className="flex items-center gap-2 px-4 py-4 md:hidden">
+          <CatalogSearchInput />
+          <CatalogFilterTrigger />
+        </div>
+      )}
+      <div
+        className={`mx-auto h-[68px] w-full max-w-[1200px] items-center justify-between gap-4 border-b-[0.3px] border-primary px-4 xl:px-0 ${isHome ? "hidden md:flex" : "flex"}`}
+      >
         <Link
           aria-label="Kurio: página inicial"
           className="text-sm font-bold tracking-[0.2em] text-ink"
@@ -72,9 +84,12 @@ const AppHeader = () => {
         >
           KURIO
         </Link>
-        <Tabs className="hidden h-full md:flex" value={activeTab}>
+        <Tabs
+          className={`hidden h-full ${isSearchOpen ? "lg:flex" : "md:flex"}`}
+          value={activeTab}
+        >
           <nav aria-label="Navegação principal" className="h-full">
-            <TabsList className="h-full gap-10" variant="line">
+            <TabsList className="h-full gap-4 xl:gap-10" variant="line">
               <TabsTrigger
                 className={navigationTabClassName}
                 nativeButton={false}
@@ -111,14 +126,24 @@ const AppHeader = () => {
             </TabsList>
           </nav>
         </Tabs>
-        <div className="flex items-center gap-2 sm:gap-6">
-          <Link
-            aria-label="Ir para busca de NFTs"
+        <div className="flex min-w-0 items-center gap-2 lg:gap-4">
+          {isSearchOpen && (
+            <div className="w-28 shrink xl:w-48 lg:w-40">
+              <CatalogSearchInput autoFocus compact />
+            </div>
+          )}
+          <button
+            aria-expanded={isSearchOpen}
+            aria-label="Abrir pesquisa de NFTs"
             className="grid h-10 w-10 place-items-center text-ink hover:text-accent"
-            to="/"
+            onClick={() => setIsSearchOpen((previous) => !previous)}
+            type="button"
           >
             <Search size={24} />
-          </Link>
+          </button>
+          <div className="hidden md:block lg:hidden">
+            <CatalogFilterTrigger />
+          </div>
           <Link
             aria-label={`Carrinho com ${cartItemCount} itens`}
             className="relative grid h-10 w-10 place-items-center text-ink hover:text-accent"

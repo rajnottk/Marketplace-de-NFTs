@@ -15,14 +15,21 @@ const NftCardSkeleton = ({ size = "default" }: NftCardSkeletonProps) => {
       <div
         className={cn(
           "bg-[#241612]",
-          isCompact ? "px-2 py-[26px]" : "p-2 py-10",
+          isCompact
+            ? "px-2 py-[26px]"
+            : "rounded-2xl p-2 py-3 sm:rounded-none sm:py-10",
         )}
       >
         <Skeleton className="aspect-square w-full rounded-2xl" />
       </div>
-      <Skeleton className={cn("w-3/4", isCompact ? "mt-2 h-5" : "mt-4 h-7")} />
       <Skeleton
-        className={cn("w-1/3", isCompact ? "mt-0.5 h-5" : "mt-1 h-7")}
+        className={cn(
+          "w-3/4",
+          isCompact ? "mt-2 h-5" : "mt-2 h-5 sm:mt-4 sm:h-7",
+        )}
+      />
+      <Skeleton
+        className={cn("w-1/3", isCompact ? "mt-0.5 h-5" : "mt-1 h-5 sm:h-7")}
       />
     </div>
   );

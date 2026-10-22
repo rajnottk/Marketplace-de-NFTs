@@ -350,11 +350,7 @@ export const getCatalog = (params: URLSearchParams) => {
   const page = Number(params.get("page") ?? 1);
   const pageSize = 9;
   const filtered = state.nfts.filter((nft) => {
-    const matchesQuery =
-      !query ||
-      `${nft.name} ${nft.artist} ${nft.collection}`
-        .toLowerCase()
-        .includes(query);
+    const matchesQuery = !query || nft.name.toLowerCase().includes(query);
     const matchesCategory = !category || nft.category === category;
     const matchesNetwork = !network || nft.network === network;
     const matchesMinPrice =

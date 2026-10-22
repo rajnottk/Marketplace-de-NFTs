@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { completeCollectorLogin } from "../helpers/auth";
+import {
+  completeCollectorLogin,
+  openLogin,
+  expectLoggedIn,
+  expectLoggedOut,
+} from "../helpers/auth";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/account/profile", { waitUntil: "domcontentloaded" });
@@ -141,10 +146,7 @@ test("valida a troca de senha e evita salvar o perfil com senha atual incorreta"
   await expect(page.locator("[data-password-mask]")).toHaveCount(0);
   await page.getByRole("button", { name: "Sair", exact: true }).click();
   await expect(page).toHaveURL("/");
-  await page
-    .getByRole("banner")
-    .getByRole("button", { name: "Entrar", exact: true })
-    .click();
+  await openLogin(page);
   const modal = page.getByRole("dialog", { name: "Entrar na Kurio" });
   await modal
     .getByLabel("E-mail", { exact: true })
@@ -152,9 +154,7 @@ test("valida a troca de senha e evita salvar o perfil com senha atual incorreta"
   await modal.getByLabel("Senha", { exact: true }).fill("Nova#2026");
   await modal.getByRole("button", { name: "Entrar", exact: true }).click();
   await expect(modal).toHaveCount(0);
-  await expect(
-    page.getByRole("link", { name: "Perfil de Ana Coleciona" }),
-  ).toBeVisible();
+  await expectLoggedIn(page);
 });
 
 test("navega pelas configurações e salva uma carteira", async ({
@@ -300,7 +300,7 @@ test("navega pelas configurações e salva uma carteira", async ({
     .check();
   await expect(
     secondary.getByLabel("Nome de exibição", { exact: true }),
-  ).toHaveValue("Ana Coleciona");
+  ).toHaveValue("");
   await expect(
     secondary.getByLabel("Nome do perfil", { exact: true }),
   ).toHaveValue("ana.coleciona");
@@ -320,6 +320,7 @@ test("navega pelas configurações e salva uma carteira", async ({
     secondary.getByRole("combobox", { name: "Tipo de carteira", exact: true }),
   ).toHaveText("MetaMask");
   for (const label of [
+    "Nome de exibição",
     "Apelido da carteira",
     "Endereço da carteira",
     "Código de indicação",
@@ -328,6 +329,9 @@ test("navega pelas configurações e salva uma carteira", async ({
     await expect(secondary.getByLabel(label, { exact: true })).toHaveValue("");
   }
   expect(walletWrites).toHaveLength(0);
+  await secondary
+    .getByLabel("Nome de exibição", { exact: true })
+    .fill("Ana Secundária");
   await secondary
     .getByLabel("Apelido da carteira", { exact: true })
     .fill("Ledger secundária");
@@ -377,9 +381,5 @@ test("navega pelas configurações e salva uma carteira", async ({
   await expect(page).toHaveURL("/account/profile");
   await menu.getByRole("button", { name: "Sair", exact: true }).click();
   await expect(page).toHaveURL("/");
-  await expect(
-    page
-      .getByRole("banner")
-      .getByRole("button", { name: "Entrar", exact: true }),
-  ).toBeVisible();
+  await expectLoggedOut(page);
 });

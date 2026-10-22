@@ -3,7 +3,17 @@ import { expect, test } from "@playwright/test";
 test("combina aba e filtro na URL", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: "Em alta" }).click();
+  const filtersButton = page.getByRole("button", {
+    name: "Abrir filtros",
+    exact: true,
+  });
+  if (await filtersButton.isVisible()) await filtersButton.click();
   await page.getByRole("button", { name: /Polygon/ }).click();
+  const resultsButton = page.getByRole("button", {
+    name: "Ver resultados",
+    exact: true,
+  });
+  if (await resultsButton.isVisible()) await resultsButton.click();
 
   await expect(page).toHaveURL(/tab=trending/);
   await expect(page).toHaveURL(/network=Polygon/);

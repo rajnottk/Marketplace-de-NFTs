@@ -41,17 +41,17 @@ const DecorativeCircles = () => (
 const CreatorsSection = () => (
   <section
     aria-label="Criadores"
-    className="grid gap-6 pb-8 pt-12 lg:grid-cols-2 lg:pb-16"
+    className="grid gap-4 pb-6 pt-6 sm:gap-6 sm:pb-8 sm:pt-12 lg:grid-cols-2 lg:pb-16"
   >
     {creatorCards.map((card) => (
       <article
         aria-labelledby={`creator-card-${card.id}`}
-        className="relative grid overflow-hidden rounded-2xl bg-[#241612] sm:grid-cols-[250px_minmax(0,1fr)] lg:h-[250px]"
+        className="relative grid grid-cols-[104px_minmax(0,1fr)] overflow-hidden rounded-2xl bg-[#241612] sm:grid-cols-[250px_minmax(0,1fr)] lg:h-[250px]"
         key={card.id}
       >
         <ImageWithSkeleton
           alt={card.altText}
-          containerClassName="aspect-square w-full rounded-2xl sm:h-[250px] sm:w-[250px]"
+          containerClassName="h-full min-h-40 w-full rounded-2xl sm:h-[250px] sm:w-[250px]"
           className="h-full w-full scale-110 object-cover object-[50%_35%]"
           height="250"
           loading="lazy"
@@ -59,18 +59,20 @@ const CreatorsSection = () => (
           width="250"
         />
         <DecorativeCircles />
-        <div className="flex flex-col items-end justify-center gap-4 px-6 py-5 text-right">
+        <div className="flex flex-col items-end justify-center gap-2 px-3 py-3 text-right sm:gap-4 sm:px-6 sm:py-5">
           <h2
-            className="text-lg font-bold leading-7 text-ink"
+            className="text-[13px] font-bold leading-[18px] text-ink sm:text-lg sm:leading-7"
             id={`creator-card-${card.id}`}
           >
             {card.titleLines[0]}
             <br />
             {card.titleLines[1]}
           </h2>
-          <p className="text-sm leading-6 text-[#CFB28C]">{card.description}</p>
+          <p className="text-[11px] leading-4 text-[#CFB28C] sm:text-sm sm:leading-6">
+            {card.description}
+          </p>
           <Button
-            className="h-11 bg-[#D28A4C] px-9 text-base font-medium text-[#140D0A] shadow-none hover:bg-[#D28A4C]/90 [&_svg]:size-5"
+            className="h-8 bg-[#D28A4C] px-3 text-xs font-medium text-[#140D0A] shadow-none hover:bg-[#D28A4C]/90 sm:h-11 sm:px-9 sm:text-base [&_svg]:size-4 sm:[&_svg]:size-5"
             nativeButton={false}
             render={<Link to="/creators" />}
           >
