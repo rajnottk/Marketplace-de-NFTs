@@ -211,7 +211,8 @@ test("mobile abre os filtros em modal e navega pela barra inferior", async ({
   await expect(page).toHaveURL("/cart");
   await nav.getByRole("link", { name: "Início", exact: true }).click();
   await expect(page).toHaveURL("/");
-  await nav.getByRole("button", { name: "Perfil", exact: true }).click();
+  await nav.getByRole("link", { name: "Perfil", exact: true }).click();
+  await expect(page).toHaveURL("/login");
   await completeCollectorLogin(page);
   await expect(nav.locator("img")).toHaveCount(0);
   await nav.getByRole("link", { name: "Perfil", exact: true }).click();

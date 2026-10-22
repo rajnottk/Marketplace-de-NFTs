@@ -25,10 +25,9 @@ const AuthModalProvider = ({ children }: AuthModalProviderProps) => {
       {mode && (
         <AuthModal
           mode={mode}
-          onAuthenticated={(completedMode) => {
+          onAuthenticated={() => {
             setMode(() => null);
-            if (completedMode === "register")
-              void navigate({ to: "/account/profile" });
+            void navigate({ to: "/" });
           }}
           onClose={() => setMode(() => null)}
           onModeChange={(nextMode) => setMode(() => nextMode)}

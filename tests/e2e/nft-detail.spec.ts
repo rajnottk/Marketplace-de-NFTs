@@ -88,6 +88,7 @@ test("adapta os detalhes e preserva a galeria desktop", async ({
     .getByRole("button", { name: "Favoritar NFT", exact: true })
     .click();
   await completeCollectorLogin(page);
+  await page.goto("/nfts/emerald-ape-042", { waitUntil: "domcontentloaded" });
   await page
     .getByRole("button", { name: "Remover dos favoritos", exact: true })
     .click();

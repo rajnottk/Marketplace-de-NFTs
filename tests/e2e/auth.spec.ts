@@ -9,6 +9,10 @@ import {
 test("abre e fecha o modal em qualquer página sem trocar a rota", async ({
   page,
 }, testInfo) => {
+  test.skip(
+    testInfo.project.name === "mobile",
+    "O acesso pelo footer mobile possui telas próprias de autenticação.",
+  );
   for (const path of ["/", "/nfts/emerald-ape-042", "/account/profile"]) {
     await page.goto(path);
     await openLogin(page);
@@ -28,7 +32,7 @@ test("abre e fecha o modal em qualquer página sem trocar a rota", async ({
   }
 });
 
-test("entra, preserva a página e mantém o usuário após recarregar", async ({
+test("entra, volta ao início e mantém o usuário após recarregar", async ({
   page,
 }) => {
   await page.goto("/nfts/emerald-ape-042");
@@ -36,12 +40,12 @@ test("entra, preserva a página e mantém o usuário após recarregar", async ({
     .getByRole("button", { name: /^Favoritar( NFT)?$/, exact: true })
     .click();
   await completeCollectorLogin(page);
-  await expect(page).toHaveURL("/nfts/emerald-ape-042");
+  await expect(page).toHaveURL("/");
   await page.reload();
   await expectLoggedIn(page);
 });
 
-test("cadastra com confirmação de senha visível e leva ao perfil", async ({
+test("cadastra com confirmação de senha visível e leva ao início", async ({
   page,
 }, testInfo) => {
   await page.goto("/nfts/emerald-ape-042");
@@ -113,11 +117,8 @@ test("cadastra com confirmação de senha visível e leva ao perfil", async ({
   ]);
   await page.screenshot({ path: testInfo.outputPath("register-modal.png") });
   await modal.getByRole("button", { name: "Criar conta", exact: true }).click();
-  await expect(page).toHaveURL("/account/profile");
+  await expect(page).toHaveURL("/");
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(
-    page.getByRole("heading", { name: /perfil do colecionador/i }),
-  ).toBeVisible();
   await expectLoggedIn(page, "Lia Coleciona");
   await expect(
     page.getByRole("link", {
@@ -130,7 +131,7 @@ test("cadastra com confirmação de senha visível e leva ao perfil", async ({
 test("recupera senha apenas visualmente e permite voltar pela aba Entrar", async ({
   page,
 }, testInfo) => {
-  await page.goto("/");
+  await page.goto("/nfts/emerald-ape-042");
   await openLogin(page);
   const authRequests: string[] = [];
   page.on("request", (request) => {
@@ -174,7 +175,7 @@ test("recupera senha apenas visualmente e permite voltar pela aba Entrar", async
 test("mostra erros de acesso sem fechar o modal ou simular login social", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/nfts/emerald-ape-042");
   await openLogin(page);
   const modal = page.getByRole("dialog", { name: "Entrar na Kurio" });
   await modal.getByRole("button", { name: "Entrar", exact: true }).click();

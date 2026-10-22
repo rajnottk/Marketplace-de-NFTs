@@ -11,6 +11,7 @@ import { AccountConstructionPage } from "modules/account/pages/account-construct
 import { AccountLayout } from "modules/account/components/account-layout";
 import { CartPage } from "modules/cart/pages/cart.page";
 import { CatalogPage } from "modules/catalog/pages/catalog.page";
+import { AuthPage } from "modules/auth/pages/auth.page";
 import { CheckoutPage } from "modules/checkout/pages/checkout.page";
 import { NftDetailPage } from "modules/nft-detail/pages/nft-detail.page";
 import { UnderConstructionPage } from "modules/under-construction/pages/under-construction.page";
@@ -55,6 +56,16 @@ const checkoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/checkout",
   component: CheckoutPage,
+});
+const loginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/login",
+  component: () => <AuthPage mode="login" />,
+});
+const registerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/register",
+  component: () => <AuthPage mode="register" />,
 });
 const accountRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -134,6 +145,8 @@ const routeTree = rootRoute.addChildren([
   nftDetailRoute,
   cartRoute,
   checkoutRoute,
+  loginRoute,
+  registerRoute,
   accountRoute.addChildren([
     profileRoute,
     walletsRoute,

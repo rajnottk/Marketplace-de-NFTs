@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AuthMode } from "modules/auth/context/auth-modal.context";
 import { PasswordField } from "shared/components/molecules/password-field";
 import { Input } from "shared/components/ui/input";
+import { cn } from "shared/lib/utils";
 
 const requiredText = z
   .string()
@@ -26,7 +27,7 @@ const registerSchema = loginSchema
   });
 const resetSchema = z.object({ email: emailSchema });
 const inputClassName =
-  "h-10 rounded-[5px] border-line bg-transparent text-sm text-ink placeholder:text-muted-foreground aria-[invalid=true]:border-danger";
+  "h-10 rounded-[5px] border-line bg-transparent text-left text-sm text-ink placeholder:text-muted-foreground aria-[invalid=true]:border-danger";
 
 export interface AuthFormValues {
   displayName: string;
@@ -40,6 +41,7 @@ interface AuthFormProps {
   isPending: boolean;
   onSubmit: (values: AuthFormValues) => void;
   onModeChange: (mode: AuthMode) => void;
+  presentation?: "modal" | "page";
 }
 
 const AuthForm = ({
@@ -47,7 +49,9 @@ const AuthForm = ({
   isPending,
   onSubmit,
   onModeChange,
+  presentation = "modal",
 }: AuthFormProps) => {
+  const isPage = presentation === "page";
   const [isResetSent, setIsResetSent] = useState(false);
   const {
     register,
@@ -65,10 +69,14 @@ const AuthForm = ({
   });
   const isRegister = mode === "register";
   const isReset = mode === "reset";
+  const registerSubmitLabel = isPage ? "Criar perfil" : "Criar conta";
   const fieldProps = (field: keyof AuthFormValues) => ({
     ...register(field, { onChange: () => clearErrors(field) }),
     id: `auth-${field}`,
-    className: inputClassName,
+    className: cn(
+      inputClassName,
+      isPage && "h-11 rounded-[9px] text-xs placeholder:text-[#B0916A]",
+    ),
     disabled: isPending,
     "aria-invalid": Boolean(errors[field]),
     "aria-describedby": errors[field] ? `auth-${field}-error` : undefined,
@@ -134,7 +142,10 @@ const AuthForm = ({
 
   return (
     <form noValidate onSubmit={submit}>
-      <fieldset className="space-y-3" disabled={isPending}>
+      <fieldset
+        className={cn("space-y-3", isPage && "[&>legend+div]:mt-0")}
+        disabled={isPending}
+      >
         <legend className="sr-only">
           {isReset
             ? "Recuperar senha"
@@ -212,7 +223,10 @@ const AuthForm = ({
         </button>
       )}
       <button
-        className="mt-7 h-11 w-full rounded-[5px] bg-primary text-sm font-bold text-primary-foreground transition-colors hover:bg-accent-strong disabled:opacity-50"
+        className={cn(
+          "mt-7 h-11 w-full rounded-[5px] bg-primary text-sm font-bold text-primary-foreground transition-colors hover:bg-accent-strong disabled:opacity-50",
+          isPage && "h-14 rounded-[9px]",
+        )}
         disabled={isPending}
         type="submit"
       >
@@ -221,7 +235,7 @@ const AuthForm = ({
           : isReset
             ? "Enviar link de recuperação"
             : isRegister
-              ? "Criar conta"
+              ? registerSubmitLabel
               : "Entrar"}
       </button>
       {isReset && (

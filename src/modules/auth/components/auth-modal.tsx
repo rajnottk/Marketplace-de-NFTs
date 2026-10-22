@@ -1,17 +1,9 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
-import {
-  getAuthErrorMessage,
-  signInWithSocial,
-  type SocialProvider,
-} from "modules/auth/apis/firebase-auth.api";
-import {
-  AuthForm,
-  type AuthFormValues,
-} from "modules/auth/components/auth-form";
+import { getAuthErrorMessage } from "modules/auth/apis/firebase-auth.api";
+import { AuthForm } from "modules/auth/components/auth-form";
+import { useAuthSubmission } from "modules/auth/hooks/use-auth-submission";
 import { SocialLoginButtons } from "modules/auth/components/social-login-buttons";
 import type { AuthMode } from "modules/auth/context/auth-modal.context";
-import { login, queryKeys, register } from "shared/api/marketplace.api";
 import {
   Dialog,
   DialogClose,
@@ -20,7 +12,6 @@ import {
   DialogTitle,
 } from "shared/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "shared/components/ui/tabs";
-import { saveSessionToken } from "shared/lib/session";
 
 interface AuthModalProps {
   mode: AuthMode;
@@ -29,16 +20,12 @@ interface AuthModalProps {
   onAuthenticated: (mode: AuthMode) => void;
 }
 
-type AuthRequest =
-  | { type: "credentials"; values: AuthFormValues }
-  | { type: "social"; provider: SocialProvider };
 const descriptions: Record<AuthMode, string> = {
   login: "Entre para gerenciar sua carteira, coleção e perfil de criador.",
   register:
     "Crie seu perfil de colecionador e conecte uma carteira quando quiser.",
   reset: "Informe seu e-mail para receber um link de recuperação de senha.",
 };
-const privateQueryNames = new Set(["cart", "profile", "wallets", "favorites"]);
 const tabClassName =
   "px-0 text-lg font-medium text-ink after:hidden hover:text-accent data-[active]:text-accent";
 
@@ -48,31 +35,7 @@ const AuthModal = ({
   onClose,
   onAuthenticated,
 }: AuthModalProps) => {
-  const queryClient = useQueryClient();
-  const authMutation = useMutation({
-    mutationFn: (request: AuthRequest) => {
-      if (request.type === "social") return signInWithSocial(request.provider);
-      const { displayName, email, password } = request.values;
-      return mode === "register"
-        ? register(displayName, email, password)
-        : login(email, password);
-    },
-    onSuccess: async (session) => {
-      await queryClient.cancelQueries({
-        predicate: (query) => privateQueryNames.has(String(query.queryKey[0])),
-      });
-      saveSessionToken(session.sessionToken);
-      for (const key of [
-        queryKeys.profile,
-        queryKeys.wallets,
-        queryKeys.favorites,
-      ])
-        queryClient.removeQueries({ queryKey: key });
-      queryClient.setQueryData(queryKeys.session, session);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.cart });
-      onAuthenticated(mode);
-    },
-  });
+  const authMutation = useAuthSubmission(mode, onAuthenticated);
   const changeMode = (nextMode: AuthMode) => {
     if (authMutation.isPending) return;
     authMutation.reset();

@@ -16,8 +16,9 @@ export const openLogin = async (page: Page) => {
   }
   await page
     .getByRole("navigation", { name: "Navegação mobile" })
-    .getByRole("button", { name: "Perfil", exact: true })
+    .getByRole("link", { name: "Perfil", exact: true })
     .click();
+  await expect(page).toHaveURL("/login");
 };
 
 export const expectLoggedIn = async (
@@ -55,12 +56,15 @@ export const expectLoggedOut = async (page: Page) => {
   await expect(
     page
       .getByRole("navigation", { name: "Navegação mobile" })
-      .getByRole("button", { name: "Perfil", exact: true }),
-  ).toBeVisible();
+      .getByRole("link", { name: "Perfil", exact: true }),
+  ).toHaveAttribute("href", "/login");
 };
 
 export const completeCollectorLogin = async (page: Page) => {
-  const modal = page.getByRole("dialog", { name: "Entrar na Kurio" });
+  const isPage = new URL(page.url()).pathname === "/login";
+  const modal = isPage
+    ? page.getByRole("main")
+    : page.getByRole("dialog", { name: "Entrar na Kurio" });
   await expect(modal).toBeVisible();
   await modal
     .getByRole("textbox", { name: "E-mail", exact: true })
@@ -68,5 +72,6 @@ export const completeCollectorLogin = async (page: Page) => {
   await modal.getByLabel("Senha", { exact: true }).fill("Kurio#2026");
   await modal.getByRole("button", { name: "Entrar", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page).toHaveURL("/");
   await expectLoggedIn(page);
 };

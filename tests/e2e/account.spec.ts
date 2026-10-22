@@ -10,6 +10,7 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/account/profile", { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Ir para login" }).click();
   await completeCollectorLogin(page);
+  await page.goto("/account/profile", { waitUntil: "domcontentloaded" });
   await expect(
     page.getByLabel("Nome de exibição", { exact: true }),
   ).toHaveValue("Ana Coleciona");
@@ -145,13 +146,16 @@ test("valida a troca de senha e evita salvar o perfil com senha atual incorreta"
   await page.getByRole("button", { name: "Sair", exact: true }).click();
   await expect(page).toHaveURL("/");
   await openLogin(page);
-  const modal = page.getByRole("dialog", { name: "Entrar na Kurio" });
+  const modal =
+    new URL(page.url()).pathname === "/login"
+      ? page.getByRole("main")
+      : page.getByRole("dialog", { name: "Entrar na Kurio" });
   await modal
     .getByLabel("E-mail", { exact: true })
     .fill("collector@kurio.test");
   await modal.getByLabel("Senha", { exact: true }).fill("Nova#2026");
   await modal.getByRole("button", { name: "Entrar", exact: true }).click();
-  await expect(modal).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expectLoggedIn(page);
 });
 

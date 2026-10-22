@@ -7,7 +7,6 @@ import {
   faUser,
 } from "@fortawesome/free-solid-svg-icons";
 import { Scanner } from "iconsax-react";
-import { useAuthModal } from "modules/auth/hooks/use-auth-modal";
 import { getCart, getCatalog, queryKeys } from "shared/api/marketplace.api";
 import { Button, buttonVariants } from "shared/components/ui/button";
 import { useSession } from "shared/hooks/use-session";
@@ -35,7 +34,6 @@ const initialCatalogSearch = { page: 1 };
 const MobileNavigation = () => {
   const path = useRouterState({ select: (state) => state.location.pathname });
   const { data: session } = useSession();
-  const { openAuth } = useAuthModal();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: catalog } = useQuery({
@@ -146,14 +144,17 @@ const MobileNavigation = () => {
             {profileContent}
           </Link>
         ) : (
-          <Button
+          <Link
             aria-label="Perfil"
-            className={getItemClassName(path.startsWith("/account/"))}
-            onClick={() => openAuth()}
-            type="button"
+            className={getItemClassName(
+              path.startsWith("/account/") ||
+                path === "/login" ||
+                path === "/register",
+            )}
+            to="/login"
           >
             {profileContent}
-          </Button>
+          </Link>
         )}
       </div>
       {randomNftMutation.error && (
