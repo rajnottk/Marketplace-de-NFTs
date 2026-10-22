@@ -18,18 +18,18 @@ export const nftSchema = z.object({
   network: networkSchema,
   rarity: z.enum(["Comum", "Raro", "Épico", "Lendário"]),
   version: z.number().int().positive(),
-  destaque: z.boolean().optional(),
-  listadoEm: z.string().datetime(),
-  quantidadeVendas: z.number().int().nonnegative(),
+  featured: z.boolean().optional(),
+  listedAt: z.string().datetime(),
+  salesCount: z.number().int().nonnegative(),
 });
 export type Nft = z.infer<typeof nftSchema>;
 
 export const postSchema = z.object({
   id: z.string(),
-  dataPublicacao: z.string().date(),
-  tempoLeituraMinutos: z.number().int().positive(),
-  titulo: z.string(),
-  descricao: z.string(),
+  publishedAt: z.string().date(),
+  readingTimeMinutes: z.number().int().positive(),
+  title: z.string(),
+  description: z.string(),
   imageUrl: z.string().min(1),
 });
 export type Post = z.infer<typeof postSchema>;
@@ -111,7 +111,7 @@ export const catalogSearchSchema = z.object({
     .optional()
     .catch("recent"),
   page: z.coerce.number().int().positive().optional().catch(1),
-  aba: z.enum(["todos", "novos", "em-alta"]).optional().catch(undefined),
+  tab: z.enum(["all", "new", "trending"]).optional().catch(undefined),
   minPrice: z.coerce.number().nonnegative().optional().catch(undefined),
   maxPrice: z.coerce.number().nonnegative().optional().catch(undefined),
 });

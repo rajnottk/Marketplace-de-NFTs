@@ -2,15 +2,15 @@ import { Link } from "@tanstack/react-router";
 import { Construction } from "lucide-react";
 import { Button } from "shared/components/ui/button";
 
-interface EmConstrucaoPageProps {
-  titulo: string;
+interface UnderConstructionPageProps {
+  title: string;
 }
 
-const EmConstrucaoPage = ({ titulo }: EmConstrucaoPageProps) => (
+const UnderConstructionPage = ({ title }: UnderConstructionPageProps) => (
   <main className="mx-auto grid min-h-[60vh] max-w-[1200px] place-items-center px-4 py-16 text-center xl:px-0">
     <div className="flex flex-col items-center gap-5">
       <Construction aria-hidden className="text-accent" size={40} />
-      <p className="text-sm tracking-[0.1em] text-[#CFB28C]">{titulo}</p>
+      <p className="text-sm tracking-[0.1em] text-[#CFB28C]">{title}</p>
       <h1 className="font-display text-2xl font-bold sm:text-3xl">
         PÁGINA EM CONSTRUÇÃO
       </h1>
@@ -28,4 +28,4 @@ const EmConstrucaoPage = ({ titulo }: EmConstrucaoPageProps) => (
   </main>
 );
 
-export { EmConstrucaoPage };
+export { UnderConstructionPage };

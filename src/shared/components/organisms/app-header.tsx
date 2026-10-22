@@ -13,30 +13,30 @@ import { Tabs, TabsList, TabsTrigger } from "shared/components/ui/tabs";
 import { useSession } from "shared/hooks/use-session";
 import { clearSessionToken } from "shared/lib/session";
 
-type AbaNavegacao = "inicio" | "mercado" | "criadores" | "aprenda";
+type NavigationTab = "home" | "market" | "creators" | "learn";
 
-const buscaMercado = { page: 1 };
+const marketSearch = { page: 1 };
 
-const itensNavegacaoEmConstrucao = [
-  { label: "Criadores", value: "criadores", to: "/criadores" },
-  { label: "Aprenda", value: "aprenda", to: "/aprenda" },
+const underConstructionNavigationItems = [
+  { label: "Criadores", value: "creators", to: "/creators" },
+  { label: "Aprenda", value: "learn", to: "/learn" },
 ] as const;
 
-const classeAbaNavegacao =
+const navigationTabClassName =
   "h-full flex-none px-0 text-base font-normal text-ink hover:text-accent data-[active]:text-accent after:!bottom-0 after:!h-[3px] after:rounded-t-sm after:bg-accent";
 
-const obterAbaAtiva = (caminhoAtual: string): AbaNavegacao | null => {
-  if (caminhoAtual === "/") return "inicio";
-  if (caminhoAtual.startsWith("/nfts/")) return "mercado";
-  const itemEmConstrucao = itensNavegacaoEmConstrucao.find(
-    (item) => item.to === caminhoAtual,
+const getActiveTab = (currentPath: string): NavigationTab | null => {
+  if (currentPath === "/") return "home";
+  if (currentPath.startsWith("/nfts/")) return "market";
+  const underConstructionItem = underConstructionNavigationItems.find(
+    (item) => item.to === currentPath,
   );
-  return itemEmConstrucao?.value ?? null;
+  return underConstructionItem?.value ?? null;
 };
 
 const AppHeader = () => {
   const queryClient = useQueryClient();
-  const caminhoAtual = useRouterState({
+  const currentPath = useRouterState({
     select: (state) => state.location.pathname,
   });
   const { data: session } = useSession();
@@ -44,9 +44,9 @@ const AppHeader = () => {
     queryKey: queryKeys.cart,
     queryFn: getCart,
   });
-  const { data: catalogoMercado } = useQuery({
-    queryKey: queryKeys.catalog(buscaMercado),
-    queryFn: () => getCatalog(buscaMercado),
+  const { data: marketCatalog } = useQuery({
+    queryKey: queryKeys.catalog(marketSearch),
+    queryFn: () => getCatalog(marketSearch),
   });
   const logoutMutation = useMutation({
     mutationFn: logout,
@@ -61,15 +61,15 @@ const AppHeader = () => {
 
   const cartItemCount =
     cart?.items.reduce((total, item) => total + item.quantity, 0) ?? 0;
-  const abaAtiva = obterAbaAtiva(caminhoAtual);
+  const activeTab = getActiveTab(currentPath);
 
-  // Sorteia um novo NFT a cada mudança de rota, para "Mercado" sempre abrir um item aleatório.
-  const nftAleatorioId = useMemo(() => {
-    const itensMercado = catalogoMercado?.items ?? [];
-    if (!itensMercado.length) return null;
-    return itensMercado[Math.floor(Math.random() * itensMercado.length)].id;
+  // Picks a new NFT on every route change so "Mercado" always opens a random item.
+  const randomNftId = useMemo(() => {
+    const marketItems = marketCatalog?.items ?? [];
+    if (!marketItems.length) return null;
+    return marketItems[Math.floor(Math.random() * marketItems.length)].id;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalogoMercado, caminhoAtual]);
+  }, [marketCatalog, currentPath]);
 
   return (
     <header className="sticky top-0 z-30 bg-[#140D0A] font-mono">
@@ -81,37 +81,34 @@ const AppHeader = () => {
         >
           KURIO
         </Link>
-        <Tabs className="hidden h-full md:flex" value={abaAtiva}>
+        <Tabs className="hidden h-full md:flex" value={activeTab}>
           <nav aria-label="Navegação principal" className="h-full">
             <TabsList className="h-full gap-10" variant="line">
               <TabsTrigger
-                className={classeAbaNavegacao}
+                className={navigationTabClassName}
                 nativeButton={false}
                 render={<Link to="/" />}
-                value="inicio"
+                value="home"
               >
                 Início
               </TabsTrigger>
               <TabsTrigger
-                className={classeAbaNavegacao}
+                className={navigationTabClassName}
                 nativeButton={false}
                 render={
-                  nftAleatorioId ? (
-                    <Link
-                      params={{ nftId: nftAleatorioId }}
-                      to="/nfts/$nftId"
-                    />
+                  randomNftId ? (
+                    <Link params={{ nftId: randomNftId }} to="/nfts/$nftId" />
                   ) : (
                     <Link to="/" />
                   )
                 }
-                value="mercado"
+                value="market"
               >
                 Mercado
               </TabsTrigger>
-              {itensNavegacaoEmConstrucao.map((item) => (
+              {underConstructionNavigationItems.map((item) => (
                 <TabsTrigger
-                  className={classeAbaNavegacao}
+                  className={navigationTabClassName}
                   key={item.value}
                   nativeButton={false}
                   render={<Link to={item.to} />}

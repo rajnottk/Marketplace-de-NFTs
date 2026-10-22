@@ -7,7 +7,7 @@ import { login, queryKeys, register } from "shared/api/marketplace.api";
 import { Button } from "shared/components/ui/button";
 import { Input } from "shared/components/ui/input";
 import { saveSessionToken } from "shared/lib/session";
-import imagemFundoAutenticacao from "assets/images/ape-green-jacket.png";
+import authBackgroundImage from "assets/images/ape-green-jacket.png";
 
 const loginFormSchema = z.object({
   email: z.string().email("Informe um e-mail válido."),
@@ -88,7 +88,7 @@ const AuthPage = ({ mode }: AuthPageProps) => {
         <div
           className="hidden min-h-[35rem] bg-cover bg-center p-8 md:flex md:flex-col md:justify-end"
           style={{
-            backgroundImage: `linear-gradient(rgba(22,11,8,.35),rgba(22,11,8,.75)),url(${imagemFundoAutenticacao})`,
+            backgroundImage: `linear-gradient(rgba(22,11,8,.35),rgba(22,11,8,.75)),url(${authBackgroundImage})`,
           }}
         >
           <p className="font-display text-3xl font-bold text-ink">KURIO</p>

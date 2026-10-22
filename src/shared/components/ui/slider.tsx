@@ -11,7 +11,7 @@ function Slider({
   max = 100,
   ...props
 }: SliderPrimitive.Root.Props) {
-  const valoresSlider = React.useMemo(
+  const sliderValues = React.useMemo(
     () =>
       Array.isArray(value)
         ? value
@@ -44,11 +44,11 @@ function Slider({
             data-slot="slider-range"
             className="h-full rounded-full bg-primary"
           />
-          {Array.from({ length: valoresSlider.length }, (_, indice) => (
+          {Array.from({ length: sliderValues.length }, (_, index) => (
             <SliderPrimitive.Thumb
               data-slot="slider-thumb"
-              index={indice}
-              key={indice}
+              index={index}
+              key={index}
               className="block size-4 shrink-0 rounded-full border-2 border-[#140D0A] bg-primary shadow-sm outline-none ring-primary/50 transition-[box-shadow] hover:ring-4 focus-visible:ring-4 data-[disabled]:pointer-events-none"
             />
           ))}

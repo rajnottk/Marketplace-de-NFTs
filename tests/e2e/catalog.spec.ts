@@ -5,7 +5,7 @@ test("combina aba e filtro na URL", async ({ page }) => {
   await page.getByRole("tab", { name: "Em alta" }).click();
   await page.getByRole("button", { name: /Polygon/ }).click();
 
-  await expect(page).toHaveURL(/aba=em-alta/);
+  await expect(page).toHaveURL(/tab=trending/);
   await expect(page).toHaveURL(/network=Polygon/);
   await expect(
     page.getByRole("heading", { name: "Neon Vessel #552" }),

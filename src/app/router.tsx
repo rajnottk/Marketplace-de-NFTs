@@ -10,9 +10,9 @@ import { AuthPage } from "modules/auth/pages/auth.page";
 import { CartPage } from "modules/cart/pages/cart.page";
 import { CatalogPage } from "modules/catalog/pages/catalog.page";
 import { CheckoutPage } from "modules/checkout/pages/checkout.page";
-import { EmConstrucaoPage } from "modules/em-construcao/pages/em-construcao.page";
 import { NftDetailPage } from "modules/nft-detail/pages/nft-detail.page";
 import { OrderConfirmationPage } from "modules/orders/pages/order-confirmation.page";
+import { UnderConstructionPage } from "modules/under-construction/pages/under-construction.page";
 import { Button } from "shared/components/ui/button";
 import { catalogSearchSchema } from "shared/contracts/marketplace";
 
@@ -75,15 +75,15 @@ const profileRoute = createRoute({
   path: "/account/profile",
   component: ProfilePage,
 });
-const criadoresRoute = createRoute({
+const creatorsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/criadores",
-  component: () => <EmConstrucaoPage titulo="Criadores" />,
+  path: "/creators",
+  component: () => <UnderConstructionPage title="Criadores" />,
 });
-const aprendaRoute = createRoute({
+const learnRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/aprenda",
-  component: () => <EmConstrucaoPage titulo="Aprenda" />,
+  path: "/learn",
+  component: () => <UnderConstructionPage title="Aprenda" />,
 });
 const walletsRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -101,8 +101,8 @@ const routeTree = rootRoute.addChildren([
   registerRoute,
   profileRoute,
   walletsRoute,
-  criadoresRoute,
-  aprendaRoute,
+  creatorsRoute,
+  learnRoute,
 ]);
 
 export const router = createRouter({ routeTree });

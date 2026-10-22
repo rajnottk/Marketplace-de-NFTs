@@ -8,7 +8,7 @@ import {
   getCatalog,
   getFavorites,
   getNft,
-  getNftDestaque,
+  getFeaturedNft,
   getPosts,
   getOrder,
   getSession,
@@ -118,12 +118,12 @@ export const handlers = [
     return HttpResponse.json(getPosts());
   }),
 
-  http.get("/api/nfts/destaque", async () => {
+  http.get("/api/nfts/featured", async () => {
     await waitForMockNetwork();
-    const nftDestaque = getNftDestaque();
-    if (!nftDestaque)
+    const featuredNft = getFeaturedNft();
+    if (!featuredNft)
       return apiError("NOT_FOUND", "NFT em destaque não encontrado.", 404);
-    return HttpResponse.json(nftDestaque);
+    return HttpResponse.json(featuredNft);
   }),
 
   http.get("/api/nfts/:nftId", async ({ params }) => {

@@ -20,8 +20,8 @@ import {
 } from "shared/contracts/marketplace";
 import { postFixtures } from "mocks/fixtures/posts";
 import {
-  imagemMacacoGolaAlta,
-  imagemMacacoJaquetaVerde,
+  apeGreenJacketImage,
+  apeTurtleneckImage,
   nftFixtures,
 } from "mocks/fixtures/nfts";
 
@@ -39,7 +39,7 @@ interface MockState {
   wallets: Record<string, Wallet[]>;
 }
 
-const persistenceKey = "kurio.mock-state.v3";
+const persistenceKey = "kurio.mock-state.v4";
 const hashSeed = 17;
 const hashMultiplier = 31;
 
@@ -57,7 +57,7 @@ const defaultUser: MockUser = {
   displayName: "Ana Coleciona",
   email: "collector@kurio.test",
   passwordHash: hashPassword("Kurio#2026"),
-  avatarUrl: imagemMacacoJaquetaVerde,
+  avatarUrl: apeGreenJacketImage,
   sessionVersion: 1,
 };
 
@@ -138,10 +138,10 @@ const getNftById = (nftId: string) =>
 
 export const getNft = (nftId: string) => getNftById(nftId) ?? null;
 
-export const getNftDestaque = () =>
-  state.nfts.find((nft) => nft.destaque) ?? null;
+export const getFeaturedNft = () =>
+  state.nfts.find((nft) => nft.featured) ?? null;
 
-// Conteúdo editorial estático: não faz parte do estado persistido do mock.
+// Static editorial content: not part of the persisted mock state.
 export const getPosts = () => postFixtures.map((post) => ({ ...post }));
 
 const replaceCart = (owner: string, cart: Cart) => {
@@ -224,7 +224,7 @@ export const register = (
     displayName,
     email,
     passwordHash: hashPassword(password),
-    avatarUrl: imagemMacacoGolaAlta,
+    avatarUrl: apeTurtleneckImage,
     sessionVersion: 1,
   };
   const sessionToken = createToken(user.id);
@@ -248,14 +248,14 @@ export const logout = (sessionToken: string | null) => {
   commitState({ ...state, sessions });
 };
 
-const quantidadeVendasEmAlta = 100;
+const trendingSalesThreshold = 100;
 
-const foiListadoNoMesAtual = (listadoEm: string) => {
-  const dataListagem = new Date(listadoEm);
-  const hoje = new Date();
+const wasListedThisMonth = (listedAt: string) => {
+  const listingDate = new Date(listedAt);
+  const today = new Date();
   return (
-    dataListagem.getFullYear() === hoje.getFullYear() &&
-    dataListagem.getMonth() === hoje.getMonth()
+    listingDate.getFullYear() === today.getFullYear() &&
+    listingDate.getMonth() === today.getMonth()
   );
 };
 
@@ -263,9 +263,9 @@ export const getCatalog = (params: URLSearchParams) => {
   const query = params.get("q")?.trim().toLowerCase() ?? "";
   const category = params.get("category");
   const network = params.get("network");
-  const abaCatalogo = params.get("aba") ?? "todos";
-  const precoMinimo = params.get("minPrice");
-  const precoMaximo = params.get("maxPrice");
+  const tab = params.get("tab") ?? "all";
+  const minPrice = params.get("minPrice");
+  const maxPrice = params.get("maxPrice");
   const sort = params.get("sort") ?? "recent";
   const page = Number(params.get("page") ?? 1);
   const pageSize = 9;
@@ -277,23 +277,23 @@ export const getCatalog = (params: URLSearchParams) => {
         .includes(query);
     const matchesCategory = !category || nft.category === category;
     const matchesNetwork = !network || nft.network === network;
-    const atendePrecoMinimo =
-      !precoMinimo || new Decimal(nft.priceEth).gte(precoMinimo);
-    const atendePrecoMaximo =
-      !precoMaximo || new Decimal(nft.priceEth).lte(precoMaximo);
-    const atendeAba =
-      abaCatalogo === "novos"
-        ? foiListadoNoMesAtual(nft.listadoEm)
-        : abaCatalogo === "em-alta"
-          ? nft.quantidadeVendas >= quantidadeVendasEmAlta
+    const matchesMinPrice =
+      !minPrice || new Decimal(nft.priceEth).gte(minPrice);
+    const matchesMaxPrice =
+      !maxPrice || new Decimal(nft.priceEth).lte(maxPrice);
+    const matchesTab =
+      tab === "new"
+        ? wasListedThisMonth(nft.listedAt)
+        : tab === "trending"
+          ? nft.salesCount >= trendingSalesThreshold
           : true;
     return (
       matchesQuery &&
       matchesCategory &&
       matchesNetwork &&
-      atendePrecoMinimo &&
-      atendePrecoMaximo &&
-      atendeAba
+      matchesMinPrice &&
+      matchesMaxPrice &&
+      matchesTab
     );
   });
   const sorted = [...filtered].sort((left, right) => {
@@ -302,7 +302,7 @@ export const getCatalog = (params: URLSearchParams) => {
     if (sort === "price-desc")
       return new Decimal(right.priceEth).cmp(left.priceEth);
     return (
-      new Date(right.listadoEm).getTime() - new Date(left.listadoEm).getTime()
+      new Date(right.listedAt).getTime() - new Date(left.listedAt).getTime()
     );
   });
   const facets = state.nfts.reduce<Record<string, number>>(

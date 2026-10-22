@@ -2,31 +2,31 @@ import { useCallback, useState, type ComponentProps } from "react";
 import { Skeleton } from "shared/components/ui/skeleton";
 import { cn } from "shared/lib/utils";
 
-interface ImagemComSkeletonProps extends ComponentProps<"img"> {
-  classeContainer?: string;
+interface ImageWithSkeletonProps extends ComponentProps<"img"> {
+  containerClassName?: string;
 }
 
-// Mostra um Skeleton enquanto a imagem carrega e revela a imagem com fade, evitando a "piscada".
-const ImagemComSkeleton = ({
-  classeContainer,
+// Shows a Skeleton while the image loads, then fades the image in to avoid a flash of empty content.
+const ImageWithSkeleton = ({
+  containerClassName,
   className,
   onLoad,
   ...props
-}: ImagemComSkeletonProps) => {
-  const [imagemCarregada, setImagemCarregada] = useState(false);
+}: ImageWithSkeletonProps) => {
+  const [isImageLoaded, setIsImageLoaded] = useState(false);
 
-  // Imagens já em cache podem terminar de carregar antes do onLoad ser registrado.
-  const verificarImagemEmCache = useCallback(
-    (elementoImagem: HTMLImageElement | null) => {
-      if (elementoImagem?.complete && elementoImagem.naturalWidth > 0)
-        setImagemCarregada(true);
+  // Cached images may finish loading before the onLoad handler is attached.
+  const checkCachedImage = useCallback(
+    (imageElement: HTMLImageElement | null) => {
+      if (imageElement?.complete && imageElement.naturalWidth > 0)
+        setIsImageLoaded(true);
     },
     [],
   );
 
   return (
-    <div className={cn("relative overflow-hidden", classeContainer)}>
-      {!imagemCarregada && (
+    <div className={cn("relative overflow-hidden", containerClassName)}>
+      {!isImageLoaded && (
         <Skeleton
           aria-hidden
           className="absolute inset-0 h-full w-full rounded-none"
@@ -35,18 +35,18 @@ const ImagemComSkeleton = ({
       <img
         className={cn(
           "transition-opacity duration-500",
-          imagemCarregada ? "opacity-100" : "opacity-0",
+          isImageLoaded ? "opacity-100" : "opacity-0",
           className,
         )}
-        onLoad={(evento) => {
-          setImagemCarregada(true);
-          onLoad?.(evento);
+        onLoad={(event) => {
+          setIsImageLoaded(true);
+          onLoad?.(event);
         }}
-        ref={verificarImagemEmCache}
+        ref={checkCachedImage}
         {...props}
       />
     </div>
   );
 };
 
-export { ImagemComSkeleton };
+export { ImageWithSkeleton };

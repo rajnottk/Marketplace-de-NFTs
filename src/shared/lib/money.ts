@@ -2,13 +2,13 @@ import Decimal from "decimal.js";
 
 const ethPrecision = 4;
 
-const casasDecimaisPrecoCard = 2;
+const cardPricePrecision = 2;
 
 export const formatEth = (value: string) =>
   `${new Decimal(value).toFixed(ethPrecision)} ETH`;
 
-export const formatEthResumido = (value: string) =>
-  `${new Decimal(value).toFixed(casasDecimaisPrecoCard)} ETH`;
+export const formatEthShort = (value: string) =>
+  `${new Decimal(value).toFixed(cardPricePrecision)} ETH`;
 
 export const addEth = (...values: string[]) =>
   values

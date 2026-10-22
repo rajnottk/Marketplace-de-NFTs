@@ -17,13 +17,13 @@ import { Slider } from "shared/components/ui/slider";
 import { Tabs, TabsList, TabsTrigger } from "shared/components/ui/tabs";
 import type { CatalogSearch } from "shared/contracts/marketplace";
 import { cn } from "shared/lib/utils";
-import { CatalogoPaginacao } from "modules/catalog/components/catalogo-paginacao";
+import { CatalogPagination } from "modules/catalog/components/catalog-pagination";
+import { CreatorsSection } from "modules/catalog/components/creators-section";
+import { FeaturedNft } from "modules/catalog/components/featured-nft";
 import { HeroCarousel } from "modules/catalog/components/hero-carousel";
+import { LearnSection } from "modules/catalog/components/learn-section";
 import { NftCard } from "modules/catalog/components/nft-card";
 import { NftCardSkeleton } from "modules/catalog/components/nft-card-skeleton";
-import { NftDestaque } from "modules/catalog/components/nft-destaque";
-import { SecaoAprenda } from "modules/catalog/components/secao-aprenda";
-import { SecaoCriadores } from "modules/catalog/components/secao-criadores";
 
 const categories = [
   "Arte digital",
@@ -40,74 +40,70 @@ const networks = ["Ethereum", "Polygon", "Solana"] as const;
 const catalogGridClassName =
   "grid grid-cols-1 gap-x-9 gap-y-10 sm:grid-cols-2 xl:grid-cols-3";
 const catalogSkeletonCount = 9;
-const abasCatalogo = [
-  { label: "Todos os NFTs", value: "todos" },
-  { label: "Novos lançamentos", value: "novos" },
-  { label: "Em alta", value: "em-alta" },
+const catalogTabs = [
+  { label: "Todos os NFTs", value: "all" },
+  { label: "Novos lançamentos", value: "new" },
+  { label: "Em alta", value: "trending" },
 ] as const;
-const opcoesOrdenacao = [
+const sortOptions = [
   { label: "Listados recentemente", value: "recent" },
   { label: "Preço (decrescente)", value: "price-desc" },
   { label: "Preço (crescente)", value: "price-asc" },
 ] as const;
-const classeAbaCatalogo =
+const catalogTabClassName =
   "h-full flex-none px-0 pb-2 text-base font-normal text-ink hover:text-accent data-[active]:text-accent after:!bottom-0 after:!h-[3px] after:rounded-t-sm after:bg-accent";
-const precoMinimoSlider = 0;
-const precoMaximoSlider = 20;
-const formatadorPrecoEth = new Intl.NumberFormat("pt-BR", {
+const sliderMinPrice = 0;
+const sliderMaxPrice = 20;
+const ethPriceFormatter = new Intl.NumberFormat("pt-BR", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
-const classeTituloFiltro = "text-base font-bold text-foreground";
-const classeItemFiltro =
+const filterTitleClassName = "text-base font-bold text-foreground";
+const filterItemClassName =
   "flex w-full items-center justify-between gap-2 text-left text-sm transition-colors hover:text-foreground";
 
 const CatalogPage = () => {
   const navigate = useNavigate({ from: "/" });
   const search = useSearch({ from: "/" }) as CatalogSearch;
-  const [faixaPreco, setFaixaPreco] = useState<number[]>([
-    search.minPrice ?? precoMinimoSlider,
-    search.maxPrice ?? precoMaximoSlider,
+  const [priceRange, setPriceRange] = useState<number[]>([
+    search.minPrice ?? sliderMinPrice,
+    search.maxPrice ?? sliderMaxPrice,
   ]);
   const stableSearch = useMemo(
     () => ({ ...search, page: search.page ?? 1 }),
     [search],
   );
-  // keepPreviousData mantém as contagens dos filtros (iguais em toda busca) enquanto a nova página carrega.
+  // keepPreviousData keeps the filter counts (identical across searches) while the next page loads.
   const catalogQuery = useQuery({
     queryKey: queryKeys.catalog(stableSearch),
     queryFn: () => getCatalog(stableSearch),
     placeholderData: keepPreviousData,
   });
-  const carregandoCatalogo =
+  const isLoadingCatalog =
     catalogQuery.isPending || catalogQuery.isPlaceholderData;
-  const contagensFiltros = catalogQuery.data?.facets;
+  const filterCounts = catalogQuery.data?.facets;
   const error = catalogQuery.error ? getApiError(catalogQuery.error) : null;
 
   const updateSearch = (next: Partial<CatalogSearch>) => {
     navigate({
       to: "/",
-      search: (buscaAnterior: CatalogSearch) => ({
-        ...buscaAnterior,
+      search: (previousSearch: CatalogSearch) => ({
+        ...previousSearch,
         ...next,
         page: next.page ?? 1,
       }),
-      // Filtros, abas, ordenação e paginação só mudam a URL: manter a posição de rolagem.
+      // Filters, tabs, sorting and pagination only change the URL: keep the scroll position.
       resetScroll: false,
     });
   };
 
-  const aplicarFaixaPreco = () => {
-    const [precoMinimoSelecionado, precoMaximoSelecionado] = faixaPreco;
+  const applyPriceRange = () => {
+    const [selectedMinPrice, selectedMaxPrice] = priceRange;
     updateSearch({
       minPrice:
-        precoMinimoSelecionado > precoMinimoSlider
-          ? precoMinimoSelecionado
-          : undefined,
+        selectedMinPrice > sliderMinPrice ? selectedMinPrice : undefined,
       maxPrice:
-        precoMaximoSelecionado < precoMaximoSlider
-          ? precoMaximoSelecionado
-          : undefined,
+        selectedMaxPrice < sliderMaxPrice ? selectedMaxPrice : undefined,
     });
   };
 
@@ -153,7 +149,7 @@ const CatalogPage = () => {
         <div className="space-y-6 lg:h-fit">
           <aside className="space-y-8 rounded-kurio border border-line bg-surface p-5">
             <section aria-labelledby="collections-heading">
-              <h2 className={classeTituloFiltro} id="collections-heading">
+              <h2 className={filterTitleClassName} id="collections-heading">
                 Coleções
               </h2>
               <div className="mt-5 space-y-4 pl-3">
@@ -161,7 +157,7 @@ const CatalogPage = () => {
                   <button
                     aria-pressed={search.category === category}
                     className={cn(
-                      classeItemFiltro,
+                      filterItemClassName,
                       search.category === category
                         ? "text-accent"
                         : "text-[#CFB28C]",
@@ -176,9 +172,9 @@ const CatalogPage = () => {
                     type="button"
                   >
                     <span>{category}</span>
-                    {contagensFiltros ? (
+                    {filterCounts ? (
                       <span className="font-bold">
-                        ({contagensFiltros[category] ?? 0})
+                        ({filterCounts[category] ?? 0})
                       </span>
                     ) : (
                       <Skeleton className="h-4 w-7" />
@@ -188,35 +184,33 @@ const CatalogPage = () => {
               </div>
             </section>
             <section aria-labelledby="price-heading">
-              <h2 className={classeTituloFiltro} id="price-heading">
+              <h2 className={filterTitleClassName} id="price-heading">
                 Faixa de preço
               </h2>
               <div className="mt-4 space-y-4">
                 <Slider
                   aria-labelledby="price-heading"
-                  defaultValue={[precoMinimoSlider, precoMaximoSlider]}
-                  max={precoMaximoSlider}
-                  min={precoMinimoSlider}
-                  onValueChange={(valores) =>
-                    setFaixaPreco(valores as number[])
-                  }
+                  defaultValue={[sliderMinPrice, sliderMaxPrice]}
+                  max={sliderMaxPrice}
+                  min={sliderMinPrice}
+                  onValueChange={(values) => setPriceRange(values as number[])}
                   step={0.01}
-                  value={faixaPreco}
+                  value={priceRange}
                 />
                 <p aria-live="polite" className="pl-3 text-sm text-ink">
-                  Preço: {formatadorPrecoEth.format(faixaPreco[0])} -{" "}
-                  {formatadorPrecoEth.format(faixaPreco[1])} ETH
+                  Preço: {ethPriceFormatter.format(priceRange[0])} -{" "}
+                  {ethPriceFormatter.format(priceRange[1])} ETH
                 </p>
                 <Button
                   className="ml-3 h-9 bg-[#D28A4C] px-3 font-bold text-[#140D0A] shadow-none hover:bg-[#D28A4C]/90"
-                  onClick={aplicarFaixaPreco}
+                  onClick={applyPriceRange}
                 >
                   Aplicar
                 </Button>
               </div>
             </section>
             <section aria-labelledby="networks-heading">
-              <h2 className={classeTituloFiltro} id="networks-heading">
+              <h2 className={filterTitleClassName} id="networks-heading">
                 Rede
               </h2>
               <div className="mt-5 space-y-4 pl-3">
@@ -224,7 +218,7 @@ const CatalogPage = () => {
                   <button
                     aria-pressed={search.network === network}
                     className={cn(
-                      classeItemFiltro,
+                      filterItemClassName,
                       search.network === network
                         ? "text-accent"
                         : "text-[#CFB28C]",
@@ -239,8 +233,8 @@ const CatalogPage = () => {
                     type="button"
                   >
                     <span>{network}</span>
-                    {contagensFiltros ? (
-                      <span>({contagensFiltros[network] ?? 0})</span>
+                    {filterCounts ? (
+                      <span>({filterCounts[network] ?? 0})</span>
                     ) : (
                       <Skeleton className="h-4 w-7" />
                     )}
@@ -249,44 +243,43 @@ const CatalogPage = () => {
               </div>
             </section>
           </aside>
-          <NftDestaque />
+          <FeaturedNft />
         </div>
 
         <div className="min-w-0 space-y-8">
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <Tabs
-              onValueChange={(abaSelecionada) =>
+              onValueChange={(selectedTab) =>
                 updateSearch({
-                  aba:
-                    abaSelecionada === "todos"
+                  tab:
+                    selectedTab === "all"
                       ? undefined
-                      : (abaSelecionada as CatalogSearch["aba"]),
+                      : (selectedTab as CatalogSearch["tab"]),
                 })
               }
-              value={search.aba ?? "todos"}
+              value={search.tab ?? "all"}
             >
               <TabsList
                 aria-label="Categorias do catálogo"
                 className="h-10 gap-8"
                 variant="line"
               >
-                {abasCatalogo.map((aba) => (
+                {catalogTabs.map((tab) => (
                   <TabsTrigger
-                    className={classeAbaCatalogo}
-                    key={aba.value}
-                    value={aba.value}
+                    className={catalogTabClassName}
+                    key={tab.value}
+                    value={tab.value}
                   >
-                    {aba.label}
+                    {tab.label}
                   </TabsTrigger>
                 ))}
               </TabsList>
             </Tabs>
             <Select
-              items={opcoesOrdenacao}
-              onValueChange={(ordenacaoSelecionada) =>
+              items={sortOptions}
+              onValueChange={(selectedSort) =>
                 updateSearch({
-                  sort: (ordenacaoSelecionada ??
-                    "recent") as CatalogSearch["sort"],
+                  sort: (selectedSort ?? "recent") as CatalogSearch["sort"],
                 })
               }
               value={search.sort ?? "recent"}
@@ -299,16 +292,16 @@ const CatalogPage = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {opcoesOrdenacao.map((opcao) => (
-                  <SelectItem key={opcao.value} value={opcao.value}>
-                    {opcao.label}
+                {sortOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {carregandoCatalogo ? (
+          {isLoadingCatalog ? (
             <div
               aria-busy="true"
               aria-label="Carregando NFTs"
@@ -327,27 +320,27 @@ const CatalogPage = () => {
               title="Não foi possível carregar o catálogo"
             />
           ) : null}
-          {!carregandoCatalogo &&
+          {!isLoadingCatalog &&
           catalogQuery.data &&
           !catalogQuery.data.items.length ? (
             <EmptyState
               actionLabel="Limpar filtros"
               description="Tente remover um filtro ou trocar de categoria."
               onAction={() => {
-                setFaixaPreco([precoMinimoSlider, precoMaximoSlider]);
+                setPriceRange([sliderMinPrice, sliderMaxPrice]);
                 updateSearch({
                   category: undefined,
                   network: undefined,
                   q: undefined,
                   minPrice: undefined,
                   maxPrice: undefined,
-                  aba: undefined,
+                  tab: undefined,
                 });
               }}
               title="Nenhuma obra encontrada"
             />
           ) : null}
-          {!carregandoCatalogo && catalogQuery.data?.items.length ? (
+          {!isLoadingCatalog && catalogQuery.data?.items.length ? (
             <div className={catalogGridClassName}>
               {catalogQuery.data.items.map((nft) => (
                 <NftCard key={nft.id} nft={nft} />
@@ -355,17 +348,17 @@ const CatalogPage = () => {
             </div>
           ) : null}
           {catalogQuery.data && totalPages > 1 ? (
-            <CatalogoPaginacao
-              onMudarPagina={(pagina) => updateSearch({ page: pagina })}
-              paginaAtual={search.page ?? 1}
-              totalPaginas={totalPages}
+            <CatalogPagination
+              currentPage={search.page ?? 1}
+              onPageChange={(page) => updateSearch({ page })}
+              totalPages={totalPages}
             />
           ) : null}
         </div>
       </section>
 
-      <SecaoCriadores />
-      <SecaoAprenda />
+      <CreatorsSection />
+      <LearnSection />
     </main>
   );
 };

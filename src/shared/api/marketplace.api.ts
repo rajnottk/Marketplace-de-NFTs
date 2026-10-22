@@ -18,7 +18,7 @@ export const queryKeys = {
   cart: ["cart"] as const,
   favorites: ["favorites"] as const,
   nft: (nftId: string) => ["nft", nftId] as const,
-  nftDestaque: ["nft-destaque"] as const,
+  featuredNft: ["featured-nft"] as const,
   posts: ["posts"] as const,
   order: (orderId: string) => ["order", orderId] as const,
   profile: ["profile"] as const,
@@ -43,8 +43,8 @@ export const getPosts = async () => {
   return response.data;
 };
 
-export const getNftDestaque = async () => {
-  const response = await apiClient.get<Nft>("/nfts/destaque");
+export const getFeaturedNft = async () => {
+  const response = await apiClient.get<Nft>("/nfts/featured");
   return response.data;
 };
 
