@@ -1,53 +1,114 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { Search } from "lucide-react";
-import { useDeferredValue, useMemo, useState } from "react";
-import heroApeImage from "assets/images/ape-bucket-hat.png";
+import { useMemo, useState } from "react";
 import { getApiError } from "shared/api/api-error";
 import { getCatalog, queryKeys } from "shared/api/marketplace.api";
 import { Button } from "shared/components/ui/button";
 import { EmptyState } from "shared/components/ui/empty-state";
-import { Input } from "shared/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "shared/components/ui/select";
 import { Skeleton } from "shared/components/ui/skeleton";
+import { Slider } from "shared/components/ui/slider";
+import { Tabs, TabsList, TabsTrigger } from "shared/components/ui/tabs";
 import type { CatalogSearch } from "shared/contracts/marketplace";
 import { cn } from "shared/lib/utils";
+import { CatalogoPaginacao } from "modules/catalog/components/catalogo-paginacao";
+import { HeroCarousel } from "modules/catalog/components/hero-carousel";
 import { NftCard } from "modules/catalog/components/nft-card";
+import { NftCardSkeleton } from "modules/catalog/components/nft-card-skeleton";
+import { NftDestaque } from "modules/catalog/components/nft-destaque";
+import { SecaoAprenda } from "modules/catalog/components/secao-aprenda";
+import { SecaoCriadores } from "modules/catalog/components/secao-criadores";
 
-const categories = ["Arte digital", "Fotografia", "Arte 3D", "Generativa"];
+const categories = [
+  "Arte digital",
+  "Fotografia",
+  "Música",
+  "Arte 3D",
+  "Colecionáveis",
+  "Generativa",
+  "Jogos",
+  "Assinaturas",
+  "Utilidade",
+];
 const networks = ["Ethereum", "Polygon", "Solana"] as const;
 const catalogGridClassName =
-  "grid grid-cols-1 justify-items-center gap-3 sm:grid-cols-2 xl:grid-cols-3 xl:justify-items-start";
-const catalogSkeletonCount = 6;
+  "grid grid-cols-1 gap-x-9 gap-y-10 sm:grid-cols-2 xl:grid-cols-3";
+const catalogSkeletonCount = 9;
+const abasCatalogo = [
+  { label: "Todos os NFTs", value: "todos" },
+  { label: "Novos lançamentos", value: "novos" },
+  { label: "Em alta", value: "em-alta" },
+] as const;
+const opcoesOrdenacao = [
+  { label: "Listados recentemente", value: "recent" },
+  { label: "Preço (decrescente)", value: "price-desc" },
+  { label: "Preço (crescente)", value: "price-asc" },
+] as const;
+const classeAbaCatalogo =
+  "h-full flex-none px-0 pb-2 text-base font-normal text-ink hover:text-accent data-[active]:text-accent after:!bottom-0 after:!h-[3px] after:rounded-t-sm after:bg-accent";
+const precoMinimoSlider = 0;
+const precoMaximoSlider = 20;
+const formatadorPrecoEth = new Intl.NumberFormat("pt-BR", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+const classeTituloFiltro = "text-base font-bold text-foreground";
+const classeItemFiltro =
+  "flex w-full items-center justify-between gap-2 text-left text-sm transition-colors hover:text-foreground";
 
 const CatalogPage = () => {
   const navigate = useNavigate({ from: "/" });
   const search = useSearch({ from: "/" }) as CatalogSearch;
-  const [inputValue, setInputValue] = useState(search.q ?? "");
-  const deferredQuery = useDeferredValue(inputValue);
+  const [faixaPreco, setFaixaPreco] = useState<number[]>([
+    search.minPrice ?? precoMinimoSlider,
+    search.maxPrice ?? precoMaximoSlider,
+  ]);
   const stableSearch = useMemo(
-    () => ({
-      ...search,
-      q: deferredQuery || undefined,
-      page: search.page ?? 1,
-    }),
-    [deferredQuery, search],
+    () => ({ ...search, page: search.page ?? 1 }),
+    [search],
   );
+  // keepPreviousData mantém as contagens dos filtros (iguais em toda busca) enquanto a nova página carrega.
   const catalogQuery = useQuery({
     queryKey: queryKeys.catalog(stableSearch),
     queryFn: () => getCatalog(stableSearch),
+    placeholderData: keepPreviousData,
   });
+  const carregandoCatalogo =
+    catalogQuery.isPending || catalogQuery.isPlaceholderData;
+  const contagensFiltros = catalogQuery.data?.facets;
   const error = catalogQuery.error ? getApiError(catalogQuery.error) : null;
 
   const updateSearch = (next: Partial<CatalogSearch>) => {
     navigate({
       to: "/",
-      search: { ...search, ...next, page: next.page ?? 1 },
+      search: (buscaAnterior: CatalogSearch) => ({
+        ...buscaAnterior,
+        ...next,
+        page: next.page ?? 1,
+      }),
+      // Filtros, abas, ordenação e paginação só mudam a URL: manter a posição de rolagem.
+      resetScroll: false,
     });
   };
 
-  const handleQueryChange = (value: string) => {
-    setInputValue(value);
-    updateSearch({ q: value || undefined });
+  const aplicarFaixaPreco = () => {
+    const [precoMinimoSelecionado, precoMaximoSelecionado] = faixaPreco;
+    updateSearch({
+      minPrice:
+        precoMinimoSelecionado > precoMinimoSlider
+          ? precoMinimoSelecionado
+          : undefined,
+      maxPrice:
+        precoMaximoSelecionado < precoMaximoSlider
+          ? precoMaximoSelecionado
+          : undefined,
+    });
   };
 
   const totalPages = catalogQuery.data
@@ -59,7 +120,7 @@ const CatalogPage = () => {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
-      <section className="grid gap-10 border-b border-line pb-10 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,450px)] lg:items-center lg:pb-14">
+      <section className="relative grid gap-10 border-b border-line pb-10 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,450px)] lg:items-center lg:pb-14">
         <div className="max-w-2xl space-y-5">
           <p className="text-sm font-medium leading-4 tracking-[0.1em] text-foreground">
             Bem-vindo à Kurio
@@ -67,7 +128,7 @@ const CatalogPage = () => {
           <h1 className="max-w-[34rem] font-display text-3xl font-bold leading-10 text-foreground sm:text-[43px] sm:leading-[70px]">
             SEJA DONO DO FUTURO DA ARTE DIGITAL
           </h1>
-          <p className="max-w-xl text-sm leading-6 text-muted-foreground">
+          <p className="max-w-xl text-sm leading-6 text-[#CFB28C]">
             Descubra NFTs selecionados de criadores emergentes e consagrados.
             Colecione arte digital rara, apoie artistas e tenha uma parte da
             cultura da internet.
@@ -81,125 +142,180 @@ const CatalogPage = () => {
             Explorar
           </Button>
         </div>
-        <div className="mx-auto aspect-square w-full max-w-[450px] overflow-hidden rounded-3xl border border-line bg-surface lg:h-[450px] lg:w-[450px]">
-          <img
-            alt="Arte em destaque da coleção Kurio"
-            className="h-full w-full object-cover"
-            height="450"
-            src={heroApeImage}
-            width="450"
-          />
-        </div>
+        <HeroCarousel />
       </section>
 
       <section
         aria-label="Explorar NFTs"
-        className="grid gap-8 py-8 lg:grid-cols-[15rem_minmax(0,1fr)] lg:py-10"
+        className="grid gap-8 py-8 lg:grid-cols-[19rem_minmax(0,1fr)] lg:py-10"
         id="catalog"
       >
-        <aside className="space-y-7 rounded-kurio border border-line bg-surface p-5 lg:sticky lg:top-24 lg:h-fit">
-          <section aria-labelledby="collections-heading" className="space-y-3">
-            <h2
-              className="text-sm font-bold text-foreground"
-              id="collections-heading"
-            >
-              Coleções
-            </h2>
-            {categories.map((category) => (
-              <button
-                aria-pressed={search.category === category}
-                className={cn(
-                  "flex w-full items-center justify-between gap-2 text-left text-xs transition-colors hover:text-foreground",
-                  search.category === category
-                    ? "text-accent"
-                    : "text-muted-foreground",
-                )}
-                key={category}
-                onClick={() =>
-                  updateSearch({
-                    category:
-                      search.category === category ? undefined : category,
-                  })
-                }
-                type="button"
-              >
-                <span>{category}</span>
-                <span>({catalogQuery.data?.facets[category] ?? 0})</span>
-              </button>
-            ))}
-          </section>
-          <section aria-labelledby="networks-heading" className="space-y-3">
-            <h2
-              className="text-sm font-bold text-foreground"
-              id="networks-heading"
-            >
-              Rede
-            </h2>
-            {networks.map((network) => (
-              <button
-                aria-pressed={search.network === network}
-                className={cn(
-                  "block text-left text-xs transition-colors hover:text-foreground",
-                  search.network === network
-                    ? "text-accent"
-                    : "text-muted-foreground",
-                )}
-                key={network}
-                onClick={() =>
-                  updateSearch({
-                    network: search.network === network ? undefined : network,
-                  })
-                }
-                type="button"
-              >
-                {network}
-              </button>
-            ))}
-          </section>
-        </aside>
+        <div className="space-y-6 lg:h-fit">
+          <aside className="space-y-8 rounded-kurio border border-line bg-surface p-5">
+            <section aria-labelledby="collections-heading">
+              <h2 className={classeTituloFiltro} id="collections-heading">
+                Coleções
+              </h2>
+              <div className="mt-5 space-y-4 pl-3">
+                {categories.map((category) => (
+                  <button
+                    aria-pressed={search.category === category}
+                    className={cn(
+                      classeItemFiltro,
+                      search.category === category
+                        ? "text-accent"
+                        : "text-[#CFB28C]",
+                    )}
+                    key={category}
+                    onClick={() =>
+                      updateSearch({
+                        category:
+                          search.category === category ? undefined : category,
+                      })
+                    }
+                    type="button"
+                  >
+                    <span>{category}</span>
+                    {contagensFiltros ? (
+                      <span className="font-bold">
+                        ({contagensFiltros[category] ?? 0})
+                      </span>
+                    ) : (
+                      <Skeleton className="h-4 w-7" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </section>
+            <section aria-labelledby="price-heading">
+              <h2 className={classeTituloFiltro} id="price-heading">
+                Faixa de preço
+              </h2>
+              <div className="mt-4 space-y-4">
+                <Slider
+                  aria-labelledby="price-heading"
+                  defaultValue={[precoMinimoSlider, precoMaximoSlider]}
+                  max={precoMaximoSlider}
+                  min={precoMinimoSlider}
+                  onValueChange={(valores) =>
+                    setFaixaPreco(valores as number[])
+                  }
+                  step={0.01}
+                  value={faixaPreco}
+                />
+                <p aria-live="polite" className="pl-3 text-sm text-ink">
+                  Preço: {formatadorPrecoEth.format(faixaPreco[0])} -{" "}
+                  {formatadorPrecoEth.format(faixaPreco[1])} ETH
+                </p>
+                <Button
+                  className="ml-3 h-9 bg-[#D28A4C] px-3 font-bold text-[#140D0A] shadow-none hover:bg-[#D28A4C]/90"
+                  onClick={aplicarFaixaPreco}
+                >
+                  Aplicar
+                </Button>
+              </div>
+            </section>
+            <section aria-labelledby="networks-heading">
+              <h2 className={classeTituloFiltro} id="networks-heading">
+                Rede
+              </h2>
+              <div className="mt-5 space-y-4 pl-3">
+                {networks.map((network) => (
+                  <button
+                    aria-pressed={search.network === network}
+                    className={cn(
+                      classeItemFiltro,
+                      search.network === network
+                        ? "text-accent"
+                        : "text-[#CFB28C]",
+                    )}
+                    key={network}
+                    onClick={() =>
+                      updateSearch({
+                        network:
+                          search.network === network ? undefined : network,
+                      })
+                    }
+                    type="button"
+                  >
+                    <span>{network}</span>
+                    {contagensFiltros ? (
+                      <span>({contagensFiltros[network] ?? 0})</span>
+                    ) : (
+                      <Skeleton className="h-4 w-7" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </section>
+          </aside>
+          <NftDestaque />
+        </div>
 
-        <div className="min-w-0 space-y-6">
-          <div className="flex flex-col justify-between gap-3 sm:flex-row">
-            <label className="relative block max-w-md flex-1">
-              <span className="sr-only">Buscar NFTs</span>
-              <Search
-                aria-hidden="true"
-                className="absolute left-3 top-3 text-muted"
-                size={17}
-              />
-              <Input
-                className="pl-10"
-                onChange={(event) => handleQueryChange(event.target.value)}
-                placeholder="Buscar arte, artista ou coleção"
-                value={inputValue}
-              />
-            </label>
-            <label className="text-xs text-muted">
-              <span className="sr-only">Ordenar catálogo</span>
-              <select
-                aria-label="Ordenar catálogo"
-                className="h-11 rounded-kurio border border-line bg-surface px-3 text-ink"
-                onChange={(event) =>
-                  updateSearch({
-                    sort: event.target.value as CatalogSearch["sort"],
-                  })
-                }
-                value={search.sort ?? "recent"}
+        <div className="min-w-0 space-y-8">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <Tabs
+              onValueChange={(abaSelecionada) =>
+                updateSearch({
+                  aba:
+                    abaSelecionada === "todos"
+                      ? undefined
+                      : (abaSelecionada as CatalogSearch["aba"]),
+                })
+              }
+              value={search.aba ?? "todos"}
+            >
+              <TabsList
+                aria-label="Categorias do catálogo"
+                className="h-10 gap-8"
+                variant="line"
               >
-                <option value="recent">Listados recentemente</option>
-                <option value="price-asc">Menor preço</option>
-                <option value="price-desc">Maior preço</option>
-              </select>
-            </label>
+                {abasCatalogo.map((aba) => (
+                  <TabsTrigger
+                    className={classeAbaCatalogo}
+                    key={aba.value}
+                    value={aba.value}
+                  >
+                    {aba.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+            <Select
+              items={opcoesOrdenacao}
+              onValueChange={(ordenacaoSelecionada) =>
+                updateSearch({
+                  sort: (ordenacaoSelecionada ??
+                    "recent") as CatalogSearch["sort"],
+                })
+              }
+              value={search.sort ?? "recent"}
+            >
+              <SelectTrigger
+                aria-label="Ordenar catálogo"
+                className="text-base text-ink"
+              >
+                <span>Ordenar por:</span>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {opcoesOrdenacao.map((opcao) => (
+                  <SelectItem key={opcao.value} value={opcao.value}>
+                    {opcao.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {catalogQuery.isPending ? (
-            <div className={catalogGridClassName}>
+          {carregandoCatalogo ? (
+            <div
+              aria-busy="true"
+              aria-label="Carregando NFTs"
+              className={catalogGridClassName}
+            >
               {Array.from({ length: catalogSkeletonCount }, (_, index) => (
-                <Skeleton
-                  className="h-[356px] w-full max-w-[258px]"
-                  key={index}
-                />
+                <NftCardSkeleton key={index} />
               ))}
             </div>
           ) : null}
@@ -211,22 +327,27 @@ const CatalogPage = () => {
               title="Não foi possível carregar o catálogo"
             />
           ) : null}
-          {catalogQuery.data && !catalogQuery.data.items.length ? (
+          {!carregandoCatalogo &&
+          catalogQuery.data &&
+          !catalogQuery.data.items.length ? (
             <EmptyState
               actionLabel="Limpar filtros"
-              description="Tente remover um filtro ou buscar por outro termo."
+              description="Tente remover um filtro ou trocar de categoria."
               onAction={() => {
-                setInputValue("");
+                setFaixaPreco([precoMinimoSlider, precoMaximoSlider]);
                 updateSearch({
                   category: undefined,
                   network: undefined,
                   q: undefined,
+                  minPrice: undefined,
+                  maxPrice: undefined,
+                  aba: undefined,
                 });
               }}
               title="Nenhuma obra encontrada"
             />
           ) : null}
-          {catalogQuery.data?.items.length ? (
+          {!carregandoCatalogo && catalogQuery.data?.items.length ? (
             <div className={catalogGridClassName}>
               {catalogQuery.data.items.map((nft) => (
                 <NftCard key={nft.id} nft={nft} />
@@ -234,44 +355,17 @@ const CatalogPage = () => {
             </div>
           ) : null}
           {catalogQuery.data && totalPages > 1 ? (
-            <nav aria-label="Paginação" className="flex justify-center gap-2">
-              <button
-                className="rounded-kurio border border-line px-3 py-2 text-xs disabled:opacity-40"
-                disabled={(search.page ?? 1) === 1}
-                onClick={() => updateSearch({ page: (search.page ?? 1) - 1 })}
-                type="button"
-              >
-                Anterior
-              </button>
-              {Array.from({ length: totalPages }, (_, index) => index + 1).map(
-                (page) => (
-                  <button
-                    className={cn(
-                      "rounded-kurio border px-3 py-2 text-xs",
-                      page === (search.page ?? 1)
-                        ? "border-accent bg-accent text-canvas"
-                        : "border-line",
-                    )}
-                    key={page}
-                    onClick={() => updateSearch({ page })}
-                    type="button"
-                  >
-                    {page}
-                  </button>
-                ),
-              )}
-              <button
-                className="rounded-kurio border border-line px-3 py-2 text-xs disabled:opacity-40"
-                disabled={(search.page ?? 1) === totalPages}
-                onClick={() => updateSearch({ page: (search.page ?? 1) + 1 })}
-                type="button"
-              >
-                Próxima
-              </button>
-            </nav>
+            <CatalogoPaginacao
+              onMudarPagina={(pagina) => updateSearch({ page: pagina })}
+              paginaAtual={search.page ?? 1}
+              totalPaginas={totalPages}
+            />
           ) : null}
         </div>
       </section>
+
+      <SecaoCriadores />
+      <SecaoAprenda />
     </main>
   );
 };

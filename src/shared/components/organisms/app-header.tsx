@@ -1,23 +1,52 @@
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Heart, Menu, Search, ShoppingCart } from "lucide-react";
-import { Link } from "@tanstack/react-router";
-import { getCart, logout, queryKeys } from "shared/api/marketplace.api";
+import { LogIn, Menu, Search, ShoppingCart } from "lucide-react";
+import { Link, useRouterState } from "@tanstack/react-router";
+import {
+  getCart,
+  getCatalog,
+  logout,
+  queryKeys,
+} from "shared/api/marketplace.api";
 import { Button } from "shared/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "shared/components/ui/tabs";
 import { useSession } from "shared/hooks/use-session";
 import { clearSessionToken } from "shared/lib/session";
 
-const navigationItems = [
-  { label: "Início", to: "/" },
-  { label: "Mercado", to: "/" },
-  { label: "Criadores", to: "/" },
+type AbaNavegacao = "inicio" | "mercado" | "criadores" | "aprenda";
+
+const buscaMercado = { page: 1 };
+
+const itensNavegacaoEmConstrucao = [
+  { label: "Criadores", value: "criadores", to: "/criadores" },
+  { label: "Aprenda", value: "aprenda", to: "/aprenda" },
 ] as const;
+
+const classeAbaNavegacao =
+  "h-full flex-none px-0 text-base font-normal text-ink hover:text-accent data-[active]:text-accent after:!bottom-0 after:!h-[3px] after:rounded-t-sm after:bg-accent";
+
+const obterAbaAtiva = (caminhoAtual: string): AbaNavegacao | null => {
+  if (caminhoAtual === "/") return "inicio";
+  if (caminhoAtual.startsWith("/nfts/")) return "mercado";
+  const itemEmConstrucao = itensNavegacaoEmConstrucao.find(
+    (item) => item.to === caminhoAtual,
+  );
+  return itemEmConstrucao?.value ?? null;
+};
 
 const AppHeader = () => {
   const queryClient = useQueryClient();
+  const caminhoAtual = useRouterState({
+    select: (state) => state.location.pathname,
+  });
   const { data: session } = useSession();
   const { data: cart } = useQuery({
     queryKey: queryKeys.cart,
     queryFn: getCart,
+  });
+  const { data: catalogoMercado } = useQuery({
+    queryKey: queryKeys.catalog(buscaMercado),
+    queryFn: () => getCatalog(buscaMercado),
   });
   const logoutMutation = useMutation({
     mutationFn: logout,
@@ -32,54 +61,84 @@ const AppHeader = () => {
 
   const cartItemCount =
     cart?.items.reduce((total, item) => total + item.quantity, 0) ?? 0;
+  const abaAtiva = obterAbaAtiva(caminhoAtual);
+
+  // Sorteia um novo NFT a cada mudança de rota, para "Mercado" sempre abrir um item aleatório.
+  const nftAleatorioId = useMemo(() => {
+    const itensMercado = catalogoMercado?.items ?? [];
+    if (!itensMercado.length) return null;
+    return itensMercado[Math.floor(Math.random() * itensMercado.length)].id;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogoMercado, caminhoAtual]);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-line/80 bg-canvas/95 backdrop-blur">
-      <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
+    <header className="sticky top-0 z-30 bg-[#140D0A] font-mono">
+      <div className="mx-auto flex h-[68px] w-full max-w-[1200px] items-center justify-between gap-4 border-b-[0.3px] border-primary px-4 xl:px-0">
         <Link
           aria-label="Kurio: página inicial"
-          className="font-display text-lg font-bold tracking-[0.28em] text-ink"
+          className="text-sm font-bold tracking-[0.2em] text-ink"
           to="/"
         >
           KURIO
         </Link>
-        <nav
-          aria-label="Navegação principal"
-          className="hidden items-center gap-6 text-xs text-muted md:flex"
-        >
-          {navigationItems.map((item) => (
-            <Link
-              activeProps={{ className: "text-accent" }}
-              key={item.label}
-              to={item.to}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="flex items-center gap-1 sm:gap-2">
+        <Tabs className="hidden h-full md:flex" value={abaAtiva}>
+          <nav aria-label="Navegação principal" className="h-full">
+            <TabsList className="h-full gap-10" variant="line">
+              <TabsTrigger
+                className={classeAbaNavegacao}
+                nativeButton={false}
+                render={<Link to="/" />}
+                value="inicio"
+              >
+                Início
+              </TabsTrigger>
+              <TabsTrigger
+                className={classeAbaNavegacao}
+                nativeButton={false}
+                render={
+                  nftAleatorioId ? (
+                    <Link
+                      params={{ nftId: nftAleatorioId }}
+                      to="/nfts/$nftId"
+                    />
+                  ) : (
+                    <Link to="/" />
+                  )
+                }
+                value="mercado"
+              >
+                Mercado
+              </TabsTrigger>
+              {itensNavegacaoEmConstrucao.map((item) => (
+                <TabsTrigger
+                  className={classeAbaNavegacao}
+                  key={item.value}
+                  nativeButton={false}
+                  render={<Link to={item.to} />}
+                  value={item.value}
+                >
+                  {item.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </nav>
+        </Tabs>
+        <div className="flex items-center gap-2 sm:gap-6">
           <Link
             aria-label="Ir para busca de NFTs"
-            className="grid h-10 w-10 place-items-center text-muted hover:text-accent"
+            className="grid h-10 w-10 place-items-center text-ink hover:text-accent"
             to="/"
           >
-            <Search size={18} />
-          </Link>
-          <Link
-            aria-label="Favoritos"
-            className="hidden h-10 w-10 place-items-center text-muted hover:text-accent sm:grid"
-            to="/account/profile"
-          >
-            <Heart size={18} />
+            <Search size={24} />
           </Link>
           <Link
             aria-label={`Carrinho com ${cartItemCount} itens`}
-            className="relative grid h-10 w-10 place-items-center text-muted hover:text-accent"
+            className="relative grid h-10 w-10 place-items-center text-ink hover:text-accent"
             to="/cart"
           >
-            <ShoppingCart size={18} />
+            <ShoppingCart size={24} />
             {cartItemCount ? (
-              <span className="absolute right-0 top-0 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-bold text-canvas">
+              <span className="absolute right-0 top-0 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-bold text-[#140D0A]">
                 {cartItemCount}
               </span>
             ) : null}
@@ -88,7 +147,7 @@ const AppHeader = () => {
             <div className="flex items-center gap-2">
               <Link
                 aria-label={`Perfil de ${session.user.displayName}`}
-                className="text-xs text-ink hover:text-accent"
+                className="text-sm text-ink hover:text-accent"
                 to="/account/profile"
               >
                 <span className="sm:hidden">Perfil</span>
@@ -107,13 +166,18 @@ const AppHeader = () => {
               </Button>
             </div>
           ) : (
-            <Link to="/auth/login">
-              <Button size="sm">Entrar</Button>
-            </Link>
+            <Button
+              className="h-9 bg-[#D28A4C] px-4 text-base font-medium text-[#140D0A] shadow-none hover:bg-[#D28A4C]/90 [&_svg]:size-5"
+              nativeButton={false}
+              render={<Link to="/auth/login" />}
+            >
+              <LogIn />
+              Entrar
+            </Button>
           )}
           <button
             aria-label="Abrir menu"
-            className="grid h-10 w-10 place-items-center text-muted md:hidden"
+            className="grid h-10 w-10 place-items-center text-ink md:hidden"
             type="button"
           >
             <Menu size={19} />

@@ -3,15 +3,6 @@ import { z } from "zod";
 export const networkSchema = z.enum(["Ethereum", "Polygon", "Solana"]);
 export type Network = z.infer<typeof networkSchema>;
 
-export const nftEditionSchema = z.enum(["1/1", "1/10", "1/50", "open"]);
-export type NftEdition = z.infer<typeof nftEditionSchema>;
-
-export const nftDetailsSchema = z.object({
-  longDescription: z.array(z.string()),
-  contractAddress: z.string(),
-  royaltyPercent: z.number().nonnegative(),
-});
-
 export const nftSchema = z.object({
   id: z.string(),
   slug: z.string(),
@@ -27,34 +18,21 @@ export const nftSchema = z.object({
   network: networkSchema,
   rarity: z.enum(["Comum", "Raro", "Épico", "Lendário"]),
   version: z.number().int().positive(),
-  featured: z.boolean().optional(),
-  listedAt: z.string().datetime(),
-  salesCount: z.number().int().nonnegative(),
-  rating: z.number().min(0).max(5),
-  reviewCount: z.number().int().nonnegative(),
-  edition: nftEditionSchema,
-  tokenNumber: z.number().int().positive(),
-  traits: z.array(z.string()),
-  details: nftDetailsSchema,
+  destaque: z.boolean().optional(),
+  listadoEm: z.string().datetime(),
+  quantidadeVendas: z.number().int().nonnegative(),
 });
 export type Nft = z.infer<typeof nftSchema>;
 
 export const postSchema = z.object({
   id: z.string(),
-  publishedAt: z.string().date(),
-  readingTimeMinutes: z.number().int().positive(),
-  title: z.string(),
-  description: z.string(),
+  dataPublicacao: z.string().date(),
+  tempoLeituraMinutos: z.number().int().positive(),
+  titulo: z.string(),
+  descricao: z.string(),
   imageUrl: z.string().min(1),
 });
 export type Post = z.infer<typeof postSchema>;
-
-export const newsletterSubscriptionSchema = z.object({
-  email: z.string().trim().email("Informe um e-mail válido."),
-});
-export type NewsletterSubscription = z.infer<
-  typeof newsletterSubscriptionSchema
->;
 
 export const userSchema = z.object({
   id: z.string(),
@@ -133,7 +111,7 @@ export const catalogSearchSchema = z.object({
     .optional()
     .catch("recent"),
   page: z.coerce.number().int().positive().optional().catch(1),
-  tab: z.enum(["all", "new", "trending"]).optional().catch(undefined),
+  aba: z.enum(["todos", "novos", "em-alta"]).optional().catch(undefined),
   minPrice: z.coerce.number().nonnegative().optional().catch(undefined),
   maxPrice: z.coerce.number().nonnegative().optional().catch(undefined),
 });

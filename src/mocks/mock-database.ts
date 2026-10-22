@@ -11,8 +11,19 @@ import type {
   User,
   Wallet,
 } from "shared/contracts/marketplace";
-import { cartSchema, nftSchema, orderSchema, userSchema, walletSchema } from "shared/contracts/marketplace";
-import { nftFixtures } from "mocks/fixtures/nfts";
+import {
+  cartSchema,
+  nftSchema,
+  orderSchema,
+  userSchema,
+  walletSchema,
+} from "shared/contracts/marketplace";
+import { postFixtures } from "mocks/fixtures/posts";
+import {
+  imagemMacacoGolaAlta,
+  imagemMacacoJaquetaVerde,
+  nftFixtures,
+} from "mocks/fixtures/nfts";
 
 interface MockUser extends User {
   passwordHash: string;
@@ -28,13 +39,17 @@ interface MockState {
   wallets: Record<string, Wallet[]>;
 }
 
-const persistenceKey = "kurio.mock-state";
+const persistenceKey = "kurio.mock-state.v3";
 const hashSeed = 17;
 const hashMultiplier = 31;
 
 const hashPassword = (password: string) =>
   Array.from(password)
-    .reduce((hash, character) => (hash * hashMultiplier + character.charCodeAt(0)) | 0, hashSeed)
+    .reduce(
+      (hash, character) =>
+        (hash * hashMultiplier + character.charCodeAt(0)) | 0,
+      hashSeed,
+    )
     .toString(36);
 
 const defaultUser: MockUser = {
@@ -42,7 +57,7 @@ const defaultUser: MockUser = {
   displayName: "Ana Coleciona",
   email: "collector@kurio.test",
   passwordHash: hashPassword("Kurio#2026"),
-  avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=96&q=85",
+  avatarUrl: imagemMacacoJaquetaVerde,
   sessionVersion: 1,
 };
 
@@ -97,7 +112,8 @@ let state = readPersistedState() ?? createInitialState();
 
 const commitState = (nextState: MockState) => {
   state = nextState;
-  if (typeof window !== "undefined") window.localStorage.setItem(persistenceKey, JSON.stringify(state));
+  if (typeof window !== "undefined")
+    window.localStorage.setItem(persistenceKey, JSON.stringify(state));
 };
 
 const toPublicUser = (user: MockUser): User => ({
@@ -108,15 +124,25 @@ const toPublicUser = (user: MockUser): User => ({
   sessionVersion: user.sessionVersion,
 });
 
-const createToken = (userId: string) => `session-${userId}-${crypto.randomUUID()}`;
+const createToken = (userId: string) =>
+  `session-${userId}-${crypto.randomUUID()}`;
 
-const getOwner = (sessionToken: string | null) => state.sessions[sessionToken ?? ""] ?? "guest";
+const getOwner = (sessionToken: string | null) =>
+  state.sessions[sessionToken ?? ""] ?? "guest";
 
-const getUserById = (userId: string) => state.users.find((user) => user.id === userId);
+const getUserById = (userId: string) =>
+  state.users.find((user) => user.id === userId);
 
-const getNftById = (nftId: string) => state.nfts.find((nft) => nft.id === nftId);
+const getNftById = (nftId: string) =>
+  state.nfts.find((nft) => nft.id === nftId);
 
 export const getNft = (nftId: string) => getNftById(nftId) ?? null;
+
+export const getNftDestaque = () =>
+  state.nfts.find((nft) => nft.destaque) ?? null;
+
+// Conteúdo editorial estático: não faz parte do estado persistido do mock.
+export const getPosts = () => postFixtures.map((post) => ({ ...post }));
 
 const replaceCart = (owner: string, cart: Cart) => {
   commitState({
@@ -128,9 +154,14 @@ const replaceCart = (owner: string, cart: Cart) => {
   });
 };
 
-const calculateQuote = (cart: Cart, coupon: string | null, network: Network = "Ethereum"): Quote => {
+const calculateQuote = (
+  cart: Cart,
+  coupon: string | null,
+  network: Network = "Ethereum",
+): Quote => {
   const subtotal = cart.items.reduce(
-    (total, item) => total.plus(new Decimal(item.unitPriceEth).mul(item.quantity)),
+    (total, item) =>
+      total.plus(new Decimal(item.unitPriceEth).mul(item.quantity)),
     new Decimal(0),
   );
   const discount = coupon === "KURIO10" ? subtotal.mul(0.1) : new Decimal(0);
@@ -149,7 +180,8 @@ const calculateQuote = (cart: Cart, coupon: string | null, network: Network = "E
 };
 
 export const resetMockState = () => {
-  if (typeof window !== "undefined") window.localStorage.removeItem(persistenceKey);
+  if (typeof window !== "undefined")
+    window.localStorage.removeItem(persistenceKey);
   state = createInitialState();
 };
 
@@ -160,8 +192,15 @@ export const getSession = (sessionToken: string | null): Session | null => {
   return { sessionToken: sessionToken ?? "", user: toPublicUser(user) };
 };
 
-export const authenticate = (email: string, password: string): Session | null => {
-  const user = state.users.find((candidate) => candidate.email === email && candidate.passwordHash === hashPassword(password));
+export const authenticate = (
+  email: string,
+  password: string,
+): Session | null => {
+  const user = state.users.find(
+    (candidate) =>
+      candidate.email === email &&
+      candidate.passwordHash === hashPassword(password),
+  );
   if (!user) return null;
 
   const sessionToken = createToken(user.id);
@@ -173,7 +212,11 @@ export const authenticate = (email: string, password: string): Session | null =>
   return { sessionToken, user: toPublicUser(user) };
 };
 
-export const register = (displayName: string, email: string, password: string): Session | "conflict" => {
+export const register = (
+  displayName: string,
+  email: string,
+  password: string,
+): Session | "conflict" => {
   if (state.users.some((user) => user.email === email)) return "conflict";
 
   const user: MockUser = {
@@ -181,7 +224,7 @@ export const register = (displayName: string, email: string, password: string): 
     displayName,
     email,
     passwordHash: hashPassword(password),
-    avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=96&q=85",
+    avatarUrl: imagemMacacoGolaAlta,
     sessionVersion: 1,
   };
   const sessionToken = createToken(user.id);
@@ -205,26 +248,69 @@ export const logout = (sessionToken: string | null) => {
   commitState({ ...state, sessions });
 };
 
+const quantidadeVendasEmAlta = 100;
+
+const foiListadoNoMesAtual = (listadoEm: string) => {
+  const dataListagem = new Date(listadoEm);
+  const hoje = new Date();
+  return (
+    dataListagem.getFullYear() === hoje.getFullYear() &&
+    dataListagem.getMonth() === hoje.getMonth()
+  );
+};
+
 export const getCatalog = (params: URLSearchParams) => {
   const query = params.get("q")?.trim().toLowerCase() ?? "";
   const category = params.get("category");
   const network = params.get("network");
+  const abaCatalogo = params.get("aba") ?? "todos";
+  const precoMinimo = params.get("minPrice");
+  const precoMaximo = params.get("maxPrice");
   const sort = params.get("sort") ?? "recent";
   const page = Number(params.get("page") ?? 1);
-  const pageSize = 6;
+  const pageSize = 9;
   const filtered = state.nfts.filter((nft) => {
-    const matchesQuery = !query || `${nft.name} ${nft.artist} ${nft.collection}`.toLowerCase().includes(query);
+    const matchesQuery =
+      !query ||
+      `${nft.name} ${nft.artist} ${nft.collection}`
+        .toLowerCase()
+        .includes(query);
     const matchesCategory = !category || nft.category === category;
     const matchesNetwork = !network || nft.network === network;
-    return matchesQuery && matchesCategory && matchesNetwork;
+    const atendePrecoMinimo =
+      !precoMinimo || new Decimal(nft.priceEth).gte(precoMinimo);
+    const atendePrecoMaximo =
+      !precoMaximo || new Decimal(nft.priceEth).lte(precoMaximo);
+    const atendeAba =
+      abaCatalogo === "novos"
+        ? foiListadoNoMesAtual(nft.listadoEm)
+        : abaCatalogo === "em-alta"
+          ? nft.quantidadeVendas >= quantidadeVendasEmAlta
+          : true;
+    return (
+      matchesQuery &&
+      matchesCategory &&
+      matchesNetwork &&
+      atendePrecoMinimo &&
+      atendePrecoMaximo &&
+      atendeAba
+    );
   });
   const sorted = [...filtered].sort((left, right) => {
-    if (sort === "price-asc") return new Decimal(left.priceEth).cmp(right.priceEth);
-    if (sort === "price-desc") return new Decimal(right.priceEth).cmp(left.priceEth);
-    return right.version - left.version;
+    if (sort === "price-asc")
+      return new Decimal(left.priceEth).cmp(right.priceEth);
+    if (sort === "price-desc")
+      return new Decimal(right.priceEth).cmp(left.priceEth);
+    return (
+      new Date(right.listadoEm).getTime() - new Date(left.listadoEm).getTime()
+    );
   });
   const facets = state.nfts.reduce<Record<string, number>>(
-    (all, nft) => ({ ...all, [nft.category]: (all[nft.category] ?? 0) + 1 }),
+    (all, nft) => ({
+      ...all,
+      [nft.category]: (all[nft.category] ?? 0) + 1,
+      [nft.network]: (all[nft.network] ?? 0) + 1,
+    }),
     {},
   );
 
@@ -237,23 +323,43 @@ export const getCatalog = (params: URLSearchParams) => {
   };
 };
 
-export const getCart = (sessionToken: string | null) => state.carts[getOwner(sessionToken)] ?? emptyCart();
+export const getCart = (sessionToken: string | null) =>
+  state.carts[getOwner(sessionToken)] ?? emptyCart();
 
 export const mergeGuestCart = (sessionToken: string) => {
   const owner = getOwner(sessionToken);
   if (owner === "guest") return getCart(sessionToken);
   const guestCart = state.carts.guest ?? emptyCart();
   const accountCart = state.carts[owner] ?? emptyCart();
-  const combinedItems = guestCart.items.reduce<CartItem[]>((items, guestItem) => {
-    const existingItem = items.find((item) => item.nft.id === guestItem.nft.id);
-    if (!existingItem) return [...items, guestItem];
+  const combinedItems = guestCart.items.reduce<CartItem[]>(
+    (items, guestItem) => {
+      const existingItem = items.find(
+        (item) => item.nft.id === guestItem.nft.id,
+      );
+      if (!existingItem) return [...items, guestItem];
 
-    const maximumQuantity = Math.min(existingItem.nft.available, existingItem.nft.maxQuantity);
-    const nextQuantity = Math.min(maximumQuantity, existingItem.quantity + guestItem.quantity);
-    return items.map((item) => (item.id === existingItem.id ? { ...existingItem, quantity: nextQuantity } : item));
-  }, accountCart.items);
+      const maximumQuantity = Math.min(
+        existingItem.nft.available,
+        existingItem.nft.maxQuantity,
+      );
+      const nextQuantity = Math.min(
+        maximumQuantity,
+        existingItem.quantity + guestItem.quantity,
+      );
+      return items.map((item) =>
+        item.id === existingItem.id
+          ? { ...existingItem, quantity: nextQuantity }
+          : item,
+      );
+    },
+    accountCart.items,
+  );
 
-  const nextCart = { items: combinedItems, quote: null, version: accountCart.version + guestCart.version + 1 };
+  const nextCart = {
+    items: combinedItems,
+    quote: null,
+    version: accountCart.version + guestCart.version + 1,
+  };
   commitState({
     ...state,
     carts: { ...state.carts, guest: emptyCart(), [owner]: nextCart },
@@ -261,14 +367,19 @@ export const mergeGuestCart = (sessionToken: string) => {
   return nextCart;
 };
 
-export const addToCart = (sessionToken: string | null, nftId: string, quantity: number) => {
+export const addToCart = (
+  sessionToken: string | null,
+  nftId: string,
+  quantity: number,
+) => {
   const owner = getOwner(sessionToken);
   const cart = getCart(sessionToken);
   const nft = getNftById(nftId);
   if (!nft) return "not-found";
   const existingItem = cart.items.find((item) => item.nft.id === nftId);
   const targetQuantity = (existingItem?.quantity ?? 0) + quantity;
-  if (targetQuantity > nft.available || targetQuantity > nft.maxQuantity) return "out-of-stock";
+  if (targetQuantity > nft.available || targetQuantity > nft.maxQuantity)
+    return "out-of-stock";
 
   const item: CartItem = existingItem
     ? { ...existingItem, quantity: targetQuantity }
@@ -287,16 +398,23 @@ export const addToCart = (sessionToken: string | null, nftId: string, quantity: 
   return nextCart;
 };
 
-export const updateCartItem = (sessionToken: string | null, itemId: string, quantity: number) => {
+export const updateCartItem = (
+  sessionToken: string | null,
+  itemId: string,
+  quantity: number,
+) => {
   const owner = getOwner(sessionToken);
   const cart = getCart(sessionToken);
   const item = cart.items.find((cartItem) => cartItem.id === itemId);
   if (!item) return "not-found";
-  if (quantity > item.nft.available || quantity > item.nft.maxQuantity) return "out-of-stock";
+  if (quantity > item.nft.available || quantity > item.nft.maxQuantity)
+    return "out-of-stock";
 
   const nextCart = {
     ...cart,
-    items: cart.items.map((cartItem) => (cartItem.id === itemId ? { ...cartItem, quantity } : cartItem)),
+    items: cart.items.map((cartItem) =>
+      cartItem.id === itemId ? { ...cartItem, quantity } : cartItem,
+    ),
     quote: null,
     version: cart.version + 1,
   };
@@ -317,7 +435,11 @@ export const removeCartItem = (sessionToken: string | null, itemId: string) => {
   return nextCart;
 };
 
-export const quoteCart = (sessionToken: string | null, coupon: string | null, network: Network) => {
+export const quoteCart = (
+  sessionToken: string | null,
+  coupon: string | null,
+  network: Network,
+) => {
   if (coupon && coupon !== "KURIO10") return "invalid-coupon";
   const owner = getOwner(sessionToken);
   const cart = getCart(sessionToken);
@@ -339,26 +461,46 @@ export const toggleFavorite = (sessionToken: string | null, nftId: string) => {
   const nextFavorites = favorites.includes(nftId)
     ? favorites.filter((favoriteId) => favoriteId !== nftId)
     : [...favorites, nftId];
-  commitState({ ...state, favorites: { ...state.favorites, [owner]: nextFavorites } });
+  commitState({
+    ...state,
+    favorites: { ...state.favorites, [owner]: nextFavorites },
+  });
   return nextFavorites;
 };
 
-export const getWallets = (sessionToken: string | null) => state.wallets[getOwner(sessionToken)] ?? [];
+export const getWallets = (sessionToken: string | null) =>
+  state.wallets[getOwner(sessionToken)] ?? [];
 
-export const saveWallet = (sessionToken: string | null, wallet: Omit<Wallet, "id">) => {
+export const saveWallet = (
+  sessionToken: string | null,
+  wallet: Omit<Wallet, "id">,
+) => {
   const owner = getOwner(sessionToken);
   const user = getUserById(owner);
   if (!user) return "unauthorized";
   const wallets = getWallets(sessionToken);
   const nextWallet: Wallet = { ...wallet, id: `wallet-${crypto.randomUUID()}` };
   const normalizedWallets = wallet.isPrimary
-    ? [...wallets.map((storedWallet) => ({ ...storedWallet, isPrimary: false })), nextWallet]
+    ? [
+        ...wallets.map((storedWallet) => ({
+          ...storedWallet,
+          isPrimary: false,
+        })),
+        nextWallet,
+      ]
     : [...wallets, nextWallet];
-  commitState({ ...state, wallets: { ...state.wallets, [owner]: normalizedWallets } });
+  commitState({
+    ...state,
+    wallets: { ...state.wallets, [owner]: normalizedWallets },
+  });
   return normalizedWallets;
 };
 
-export const createOrder = (sessionToken: string | null, network: Network, idempotencyKey: string) => {
+export const createOrder = (
+  sessionToken: string | null,
+  network: Network,
+  idempotencyKey: string,
+) => {
   const owner = getOwner(sessionToken);
   const user = getUserById(owner);
   if (!user) return "unauthorized";
@@ -387,28 +529,40 @@ export const createOrder = (sessionToken: string | null, network: Network, idemp
 
 export const getOrder = (orderId: string) => state.orders[orderId] ?? null;
 
-export const updateProfile = (sessionToken: string | null, displayName: string) => {
+export const updateProfile = (
+  sessionToken: string | null,
+  displayName: string,
+) => {
   const owner = getOwner(sessionToken);
   const user = getUserById(owner);
   if (!user) return "unauthorized";
   const updatedUser = { ...user, displayName };
   commitState({
     ...state,
-    users: state.users.map((candidate) => (candidate.id === owner ? updatedUser : candidate)),
+    users: state.users.map((candidate) =>
+      candidate.id === owner ? updatedUser : candidate,
+    ),
   });
   return toPublicUser(updatedUser);
 };
 
-export const updatePassword = (sessionToken: string | null, currentPassword: string, nextPassword: string) => {
+export const updatePassword = (
+  sessionToken: string | null,
+  currentPassword: string,
+  nextPassword: string,
+) => {
   const owner = getOwner(sessionToken);
   const user = getUserById(owner);
   if (!user) return "unauthorized";
-  if (user.passwordHash !== hashPassword(currentPassword)) return "invalid-password";
+  if (user.passwordHash !== hashPassword(currentPassword))
+    return "invalid-password";
 
   const updatedUser = { ...user, passwordHash: hashPassword(nextPassword) };
   commitState({
     ...state,
-    users: state.users.map((candidate) => (candidate.id === owner ? updatedUser : candidate)),
+    users: state.users.map((candidate) =>
+      candidate.id === owner ? updatedUser : candidate,
+    ),
   });
   return "updated";
 };

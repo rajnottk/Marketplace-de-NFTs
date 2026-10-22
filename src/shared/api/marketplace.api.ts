@@ -18,9 +18,7 @@ export const queryKeys = {
   cart: ["cart"] as const,
   favorites: ["favorites"] as const,
   nft: (nftId: string) => ["nft", nftId] as const,
-  featuredNft: ["featured-nft"] as const,
-  nftRecommendations: (nftIds: string[]) =>
-    ["nft-recommendations", [...nftIds].sort()] as const,
+  nftDestaque: ["nft-destaque"] as const,
   posts: ["posts"] as const,
   order: (orderId: string) => ["order", orderId] as const,
   profile: ["profile"] as const,
@@ -40,24 +38,13 @@ export const getNft = async (nftId: string) => {
   return response.data;
 };
 
-export const subscribeToNewsletter = async (email: string) => {
-  await apiClient.post("/newsletter", { email });
-};
-
 export const getPosts = async () => {
   const response = await apiClient.get<Post[]>("/posts");
   return response.data;
 };
 
-export const getNftRecommendations = async (nftIds: string[]) => {
-  const response = await apiClient.get<Nft[]>("/nfts/recommendations", {
-    params: { nftIds: nftIds.join(",") },
-  });
-  return response.data;
-};
-
-export const getFeaturedNft = async () => {
-  const response = await apiClient.get<Nft>("/nfts/featured");
+export const getNftDestaque = async () => {
+  const response = await apiClient.get<Nft>("/nfts/destaque");
   return response.data;
 };
 

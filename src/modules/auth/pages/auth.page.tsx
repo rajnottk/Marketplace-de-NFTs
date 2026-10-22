@@ -7,6 +7,7 @@ import { login, queryKeys, register } from "shared/api/marketplace.api";
 import { Button } from "shared/components/ui/button";
 import { Input } from "shared/components/ui/input";
 import { saveSessionToken } from "shared/lib/session";
+import imagemFundoAutenticacao from "assets/images/ape-green-jacket.png";
 
 const loginFormSchema = z.object({
   email: z.string().email("Informe um e-mail válido."),
@@ -84,7 +85,12 @@ const AuthPage = ({ mode }: AuthPageProps) => {
   return (
     <main className="grid min-h-[calc(100vh-4rem)] place-items-center px-4 py-10">
       <section className="grid w-full max-w-4xl overflow-hidden rounded-kurio border border-line bg-panel shadow-panel md:grid-cols-[1fr_0.85fr]">
-        <div className="hidden min-h-[35rem] bg-[linear-gradient(rgba(22,11,8,.35),rgba(22,11,8,.75)),url('https://images.unsplash.com/photo-1611605698335-8b1569810432?auto=format&fit=crop&w=900&q=85')] bg-cover bg-center p-8 md:flex md:flex-col md:justify-end">
+        <div
+          className="hidden min-h-[35rem] bg-cover bg-center p-8 md:flex md:flex-col md:justify-end"
+          style={{
+            backgroundImage: `linear-gradient(rgba(22,11,8,.35),rgba(22,11,8,.75)),url(${imagemFundoAutenticacao})`,
+          }}
+        >
           <p className="font-display text-3xl font-bold text-ink">KURIO</p>
           <p className="mt-3 max-w-xs text-sm leading-6 text-ink/80">
             Colecione arte digital com contexto, autoria e uma carteira sob seu
