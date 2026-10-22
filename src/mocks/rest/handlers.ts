@@ -9,6 +9,7 @@ import {
   getFavorites,
   getNft,
   getFeaturedNft,
+  getNftRecommendations,
   getPosts,
   getOrder,
   getSession,
@@ -138,6 +139,16 @@ export const handlers = [
     return HttpResponse.json(featuredNft);
   }),
 
+  http.get("/api/nfts/recommendations", async ({ request }) => {
+    await waitForMockNetwork();
+    const nftIdsParam = new URL(request.url).searchParams.get("nftIds") ?? "";
+    const referenceNftIds = nftIdsParam
+      .split(",")
+      .map((nftId) => nftId.trim())
+      .filter(Boolean);
+    return HttpResponse.json(getNftRecommendations(referenceNftIds));
+  }),
+
   http.get("/api/nfts/:nftId", async ({ params }) => {
     await waitForMockNetwork();
     const nft = getNft(String(params.nftId));
@@ -166,12 +177,6 @@ export const handlers = [
     );
     if (cart === "not-found")
       return apiError("NOT_FOUND", "NFT não encontrado.", 404);
-    if (cart === "out-of-stock")
-      return apiError(
-        "OUT_OF_STOCK",
-        "A edição não está disponível nesta quantidade.",
-        409,
-      );
     return HttpResponse.json(cart, { status: 201 });
   }),
 
@@ -187,8 +192,6 @@ export const handlers = [
     );
     if (cart === "not-found")
       return apiError("NOT_FOUND", "Item do carrinho não encontrado.", 404);
-    if (cart === "out-of-stock")
-      return apiError("OUT_OF_STOCK", "Quantidade indisponível.", 409);
     return HttpResponse.json(cart);
   }),
 

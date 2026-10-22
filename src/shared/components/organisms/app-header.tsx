@@ -27,7 +27,13 @@ const navigationTabClassName =
 
 const getActiveTab = (currentPath: string): NavigationTab | null => {
   if (currentPath === "/") return "home";
-  if (currentPath.startsWith("/nfts/")) return "market";
+  // NFT details, cart and checkout all belong to the "Mercado" section.
+  if (
+    currentPath.startsWith("/nfts/") ||
+    currentPath === "/cart" ||
+    currentPath === "/checkout"
+  )
+    return "market";
   const underConstructionItem = underConstructionNavigationItems.find(
     (item) => item.to === currentPath,
   );

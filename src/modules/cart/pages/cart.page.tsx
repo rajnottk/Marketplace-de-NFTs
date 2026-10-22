@@ -1,7 +1,6 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import { Minus, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { getApiError } from "shared/api/api-error";
 import {
   getCart,
@@ -10,214 +9,220 @@ import {
   removeCartItem,
   updateCartItem,
 } from "shared/api/marketplace.api";
-import { Button } from "shared/components/ui/button";
-import { Card } from "shared/components/ui/card";
+import { NftRecommendationsCarousel } from "shared/components/organisms/nft-recommendations-carousel";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "shared/components/ui/breadcrumb";
 import { EmptyState } from "shared/components/ui/empty-state";
-import { Input } from "shared/components/ui/input";
 import { Skeleton } from "shared/components/ui/skeleton";
-import { formatEth, multiplyEth } from "shared/lib/money";
+import type { Cart, Quote } from "shared/contracts/marketplace";
+import { CartSummary } from "modules/cart/components/cart-summary";
+import {
+  CartTable,
+  CartTableSkeleton,
+} from "modules/cart/components/cart-table";
+import { useSession } from "shared/hooks/use-session";
+
+const pageClassName = "mx-auto w-full max-w-[1200px] px-4 pb-16 pt-8 xl:px-0";
+const contentGridClassName =
+  "mt-4 grid gap-12 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-24";
+const defaultNetwork = "Ethereum";
+const couponErrorCode = "COUPON_INVALID";
+
+const CartBreadcrumb = () => (
+  <Breadcrumb>
+    <BreadcrumbList className="text-base font-bold text-ink">
+      <BreadcrumbItem>
+        <BreadcrumbLink className="hover:text-accent" render={<Link to="/" />}>
+          Início
+        </BreadcrumbLink>
+      </BreadcrumbItem>
+      <BreadcrumbSeparator />
+      <BreadcrumbItem>
+        <BreadcrumbLink
+          className="hover:text-accent"
+          render={<Link hash="catalog" to="/" />}
+        >
+          Mercado
+        </BreadcrumbLink>
+      </BreadcrumbItem>
+      <BreadcrumbSeparator />
+      <BreadcrumbItem>
+        <BreadcrumbPage className="font-bold">Carrinho</BreadcrumbPage>
+      </BreadcrumbItem>
+    </BreadcrumbList>
+  </Breadcrumb>
+);
 
 const CartPage = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [coupon, setCoupon] = useState("");
+  const { data: session, isLoading: isSessionLoading } = useSession();
+  // The mock drops the quote whenever the cart changes, so the applied coupon lives here and is re-sent on every recalculation.
+  const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const lastQuotedCartVersion = useRef<number | null>(null);
+  const pendingQuote = useRef<Promise<Quote> | null>(null);
+
   const cartQuery = useQuery({ queryKey: queryKeys.cart, queryFn: getCart });
+  const setCart = (cart: Cart) =>
+    queryClient.setQueryData(queryKeys.cart, cart);
   const updateMutation = useMutation({
     mutationFn: ({ itemId, quantity }: { itemId: string; quantity: number }) =>
       updateCartItem(itemId, quantity),
-    onSuccess: (cart) => queryClient.setQueryData(queryKeys.cart, cart),
+    onSuccess: setCart,
   });
   const removeMutation = useMutation({
     mutationFn: removeCartItem,
-    onSuccess: (cart) => queryClient.setQueryData(queryKeys.cart, cart),
+    onSuccess: setCart,
   });
   const quoteMutation = useMutation({
-    mutationFn: () => getQuote(coupon.trim() || null, "Ethereum"),
-    onSuccess: (quote) => {
+    mutationFn: (coupon: string | null) => getQuote(coupon, defaultNetwork),
+    onSuccess: (quote, coupon) => {
+      setAppliedCoupon(coupon);
+      setCouponError(null);
       queryClient.setQueryData(
         queryKeys.cart,
-        (current: Awaited<ReturnType<typeof getCart>> | undefined) =>
-          current ? { ...current, quote } : current,
+        (currentCart: Cart | undefined) =>
+          currentCart ? { ...currentCart, quote } : currentCart,
+      );
+    },
+    onError: (error) => {
+      const apiError = getApiError(error);
+      setCouponError(
+        apiError.code === couponErrorCode ? apiError.message : null,
       );
     },
   });
-  const error = cartQuery.error
-    ? getApiError(cartQuery.error)
-    : updateMutation.error
-      ? getApiError(updateMutation.error)
-      : removeMutation.error
-        ? getApiError(removeMutation.error)
-        : quoteMutation.error
-          ? getApiError(quoteMutation.error)
-          : null;
+  const { mutateAsync: calculateQuote } = quoteMutation;
+  const requestQuote = useCallback(
+    (coupon: string | null) => {
+      const request = (pendingQuote.current ?? Promise.resolve())
+        .catch(() => undefined)
+        .then(() => calculateQuote(coupon));
+      pendingQuote.current = request;
+      void request
+        .finally(() => {
+          if (pendingQuote.current === request) pendingQuote.current = null;
+        })
+        .catch(() => undefined);
+      return request;
+    },
+    [calculateQuote],
+  );
 
-  if (cartQuery.isPending)
-    return (
-      <main className="mx-auto grid max-w-7xl gap-8 px-4 py-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <Skeleton className="h-96" />
-        <Skeleton className="h-72" />
-      </main>
-    );
-  if (!cartQuery.data?.items.length)
-    return (
-      <main className="mx-auto max-w-7xl px-4 py-10">
-        <EmptyState
-          actionLabel="Explorar NFTs"
-          description="Adicione uma obra para seguir com a compra."
-          onAction={() => undefined}
-          title="Seu carrinho está vazio"
-        />
-      </main>
-    );
+  const cart = cartQuery.data;
+  const cartItems = cart?.items ?? [];
+  // After a reload the page state is empty, but the stored quote still knows which coupon was applied.
+  const activeCoupon = appliedCoupon ?? cart?.quote?.coupon ?? null;
 
-  const { items, quote } = cartQuery.data;
-  return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-12">
-      <h1 className="font-display text-3xl font-bold">SEU CARRINHO</h1>
-      <section className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="space-y-3">
-          {items.map((item) => (
-            <article
-              className="flex flex-col gap-4 rounded-kurio border border-line bg-panel p-4 sm:flex-row"
-              key={item.id}
-            >
-              <img
-                alt={`NFT ${item.nft.name}`}
-                className="h-28 w-full rounded object-cover sm:w-28"
-                src={item.nft.imageUrl}
-              />
-              <div className="flex min-w-0 flex-1 flex-col justify-between gap-3">
-                <div>
-                  <p className="text-xs text-muted">{item.nft.collection}</p>
-                  <h2 className="font-display text-sm font-bold">
-                    {item.nft.name}
-                  </h2>
-                  <p className="mt-1 text-xs text-accent">
-                    {formatEth(item.unitPriceEth)}
-                  </p>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center rounded-kurio border border-line bg-surface p-1">
-                    <Button
-                      aria-label={`Diminuir ${item.nft.name}`}
-                      disabled={item.quantity === 1 || updateMutation.isPending}
-                      onClick={() =>
-                        updateMutation.mutate({
-                          itemId: item.id,
-                          quantity: item.quantity - 1,
-                        })
-                      }
-                      size="icon"
-                      variant="ghost"
-                    >
-                      <Minus size={15} />
-                    </Button>
-                    <output className="min-w-7 text-center text-sm">
-                      {item.quantity}
-                    </output>
-                    <Button
-                      aria-label={`Aumentar ${item.nft.name}`}
-                      disabled={
-                        item.quantity >=
-                          Math.min(item.nft.available, item.nft.maxQuantity) ||
-                        updateMutation.isPending
-                      }
-                      onClick={() =>
-                        updateMutation.mutate({
-                          itemId: item.id,
-                          quantity: item.quantity + 1,
-                        })
-                      }
-                      size="icon"
-                      variant="ghost"
-                    >
-                      <Plus size={15} />
-                    </Button>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <p className="font-display text-sm font-bold">
-                      {formatEth(multiplyEth(item.unitPriceEth, item.quantity))}
-                    </p>
-                    <Button
-                      aria-label={`Remover ${item.nft.name}`}
-                      disabled={removeMutation.isPending}
-                      onClick={() => removeMutation.mutate(item.id)}
-                      size="icon"
-                      variant="ghost"
-                    >
-                      <Trash2 size={16} />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </article>
-          ))}
+  // Recalculate the summary automatically on load and after every cart change (once per cart version).
+  useEffect(() => {
+    if (
+      !cart?.items.length ||
+      cart.quote ||
+      pendingQuote.current ||
+      lastQuotedCartVersion.current === cart.version
+    )
+      return;
+    lastQuotedCartVersion.current = cart.version;
+    void requestQuote(activeCoupon).catch(() => undefined);
+  }, [cart, activeCoupon, requestQuote]);
+
+  // Cart changes clear the stored quote: pin the active coupon first so the recalculation keeps it.
+  const changeQuantity = (itemId: string, quantity: number) => {
+    setAppliedCoupon(activeCoupon);
+    updateMutation.mutate({ itemId, quantity: Math.max(1, quantity) });
+  };
+
+  const removeItem = (itemId: string) => {
+    setAppliedCoupon(activeCoupon);
+    removeMutation.mutate(itemId);
+  };
+
+  const handleApplyCoupon = (coupon: string) => {
+    if (!cart) return;
+    lastQuotedCartVersion.current = cart.version;
+    void requestQuote(coupon || null).catch(() => undefined);
+  };
+
+  const handleCheckout = async () => {
+    // A click can arrive before the pending mutation has repainted the button.
+    // Wait for the stored quote so checkout inherits the newly applied coupon.
+    try {
+      await pendingQuote.current;
+    } catch {
+      return;
+    }
+    void navigate({ to: session ? "/checkout" : "/auth/login" });
+  };
+
+  const requestError =
+    updateMutation.error ??
+    removeMutation.error ??
+    (couponError ? null : quoteMutation.error);
+  const requestErrorMessage = requestError
+    ? getApiError(requestError).message
+    : null;
+
+  if (cartQuery.isPending) {
+    return (
+      <main className={pageClassName}>
+        <Skeleton className="h-6 w-56" />
+        <div className={contentGridClassName}>
+          <CartTableSkeleton />
+          <Skeleton className="h-96 w-full" />
         </div>
-        <Card className="h-fit space-y-5 p-5 lg:sticky lg:top-24">
-          <h2 className="font-display text-lg font-bold">RESUMO</h2>
-          <div className="flex gap-2">
-            <label className="sr-only" htmlFor="coupon">
-              Cupom de desconto
-            </label>
-            <Input
-              id="coupon"
-              onChange={(event) => setCoupon(event.target.value)}
-              placeholder="Cupom"
-              value={coupon}
+      </main>
+    );
+  }
+
+  return (
+    <main className={pageClassName}>
+      <CartBreadcrumb />
+      {cartItems.length ? (
+        <div className={contentGridClassName}>
+          <div className="min-w-0">
+            <CartTable
+              isUpdating={updateMutation.isPending || removeMutation.isPending}
+              items={cartItems}
+              onQuantityChange={changeQuantity}
+              onRemove={removeItem}
             />
-            <Button
-              disabled={quoteMutation.isPending}
-              onClick={() => quoteMutation.mutate()}
-              variant="secondary"
-            >
-              Aplicar
-            </Button>
+            {requestErrorMessage && (
+              <p className="mt-3 text-sm text-danger" role="alert">
+                {requestErrorMessage}
+              </p>
+            )}
           </div>
-          <dl className="space-y-3 border-y border-line py-4 text-xs">
-            <div className="flex justify-between">
-              <dt className="text-muted">Subtotal</dt>
-              <dd>
-                {quote ? formatEth(quote.subtotalEth) : "Calcule a cotação"}
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-muted">Desconto</dt>
-              <dd className="text-accent">
-                {quote ? `- ${formatEth(quote.discountEth)}` : "—"}
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-muted">Taxa de rede</dt>
-              <dd>{quote ? formatEth(quote.networkFeeEth) : "—"}</dd>
-            </div>
-          </dl>
-          <div className="flex justify-between font-display text-sm font-bold">
-            <span>Total</span>
-            <span className="text-accent">
-              {quote ? formatEth(quote.totalEth) : "—"}
-            </span>
-          </div>
-          <Button
-            className="w-full"
-            disabled={!quote}
-            onClick={() => navigate({ to: "/checkout" })}
-            size="lg"
-          >
-            Ir para pagamento
-          </Button>
-          {!quote ? (
-            <p className="text-xs leading-5 text-muted">
-              Aplique um cupom ou deixe em branco para calcular a cotação antes
-              de pagar.
-            </p>
-          ) : null}
-          {error ? (
-            <p className="text-xs text-danger" role="alert">
-              {error.message}
-            </p>
-          ) : null}
-        </Card>
-      </section>
+          <CartSummary
+            appliedCoupon={activeCoupon}
+            couponError={couponError}
+            isQuoting={quoteMutation.isPending || isSessionLoading}
+            onApplyCoupon={handleApplyCoupon}
+            onCheckout={() => void handleCheckout()}
+            quote={cart?.quote ?? null}
+          />
+        </div>
+      ) : (
+        <div className="mt-8">
+          <EmptyState
+            actionLabel="Explorar NFTs"
+            description="Adicione uma obra para seguir com a compra."
+            onAction={() => navigate({ hash: "catalog", to: "/" })}
+            title="Seu carrinho está vazio"
+          />
+        </div>
+      )}
+      <NftRecommendationsCarousel
+        nftIds={cartItems.map((item) => item.nft.id)}
+        title="Colecionadores também viram"
+      />
     </main>
   );
 };

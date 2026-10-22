@@ -3,6 +3,15 @@ import { z } from "zod";
 export const networkSchema = z.enum(["Ethereum", "Polygon", "Solana"]);
 export type Network = z.infer<typeof networkSchema>;
 
+export const nftEditionSchema = z.enum(["1/1", "1/10", "1/50", "open"]);
+export type NftEdition = z.infer<typeof nftEditionSchema>;
+
+export const nftDetailsSchema = z.object({
+  longDescription: z.array(z.string()),
+  contractAddress: z.string(),
+  royaltyPercent: z.number().nonnegative(),
+});
+
 export const nftSchema = z.object({
   id: z.string(),
   slug: z.string(),
@@ -21,6 +30,12 @@ export const nftSchema = z.object({
   featured: z.boolean().optional(),
   listedAt: z.string().datetime(),
   salesCount: z.number().int().nonnegative(),
+  rating: z.number().min(0).max(5),
+  reviewCount: z.number().int().nonnegative(),
+  edition: nftEditionSchema,
+  tokenNumber: z.number().int().positive(),
+  traits: z.array(z.string()),
+  details: nftDetailsSchema,
 });
 export type Nft = z.infer<typeof nftSchema>;
 

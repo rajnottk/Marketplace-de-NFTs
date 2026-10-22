@@ -3,6 +3,8 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { getApiError } from "shared/api/api-error";
 import { getCatalog, queryKeys } from "shared/api/marketplace.api";
+import { NftCard } from "shared/components/molecules/nft-card";
+import { NftCardSkeleton } from "shared/components/molecules/nft-card-skeleton";
 import { Button } from "shared/components/ui/button";
 import { EmptyState } from "shared/components/ui/empty-state";
 import {
@@ -22,8 +24,6 @@ import { CreatorsSection } from "modules/catalog/components/creators-section";
 import { FeaturedNft } from "modules/catalog/components/featured-nft";
 import { HeroCarousel } from "modules/catalog/components/hero-carousel";
 import { LearnSection } from "modules/catalog/components/learn-section";
-import { NftCard } from "modules/catalog/components/nft-card";
-import { NftCardSkeleton } from "modules/catalog/components/nft-card-skeleton";
 
 const categories = [
   "Arte digital",

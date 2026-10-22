@@ -39,7 +39,7 @@ interface MockState {
   wallets: Record<string, Wallet[]>;
 }
 
-const persistenceKey = "kurio.mock-state.v4";
+const persistenceKey = "kurio.mock-state.v5";
 const hashSeed = 17;
 const hashMultiplier = 31;
 
@@ -140,6 +140,32 @@ export const getNft = (nftId: string) => getNftById(nftId) ?? null;
 
 export const getFeaturedNft = () =>
   state.nfts.find((nft) => nft.featured) ?? null;
+
+const recommendationLimit = 7;
+
+// NFTs from the reference collections first (most recently listed), topped up with other collections.
+// The reference NFTs themselves are never recommended; with no references, returns the most recent NFTs.
+export const getNftRecommendations = (referenceNftIds: string[]) => {
+  const referenceIds = new Set(referenceNftIds);
+  const referenceCollections = new Set(
+    state.nfts
+      .filter((nft) => referenceIds.has(nft.id))
+      .map((nft) => nft.collection),
+  );
+  const byMostRecent = (left: Nft, right: Nft) =>
+    new Date(right.listedAt).getTime() - new Date(left.listedAt).getTime();
+  const candidateNfts = state.nfts.filter((nft) => !referenceIds.has(nft.id));
+  const sameCollections = candidateNfts
+    .filter((nft) => referenceCollections.has(nft.collection))
+    .sort(byMostRecent);
+  const otherCollections = candidateNfts
+    .filter((nft) => !referenceCollections.has(nft.collection))
+    .sort(byMostRecent);
+  return [...sameCollections, ...otherCollections].slice(
+    0,
+    recommendationLimit,
+  );
+};
 
 // Static editorial content: not part of the persisted mock state.
 export const getPosts = () => postFixtures.map((post) => ({ ...post }));
@@ -338,14 +364,7 @@ export const mergeGuestCart = (sessionToken: string) => {
       );
       if (!existingItem) return [...items, guestItem];
 
-      const maximumQuantity = Math.min(
-        existingItem.nft.available,
-        existingItem.nft.maxQuantity,
-      );
-      const nextQuantity = Math.min(
-        maximumQuantity,
-        existingItem.quantity + guestItem.quantity,
-      );
+      const nextQuantity = existingItem.quantity + guestItem.quantity;
       return items.map((item) =>
         item.id === existingItem.id
           ? { ...existingItem, quantity: nextQuantity }
@@ -378,8 +397,6 @@ export const addToCart = (
   if (!nft) return "not-found";
   const existingItem = cart.items.find((item) => item.nft.id === nftId);
   const targetQuantity = (existingItem?.quantity ?? 0) + quantity;
-  if (targetQuantity > nft.available || targetQuantity > nft.maxQuantity)
-    return "out-of-stock";
 
   const item: CartItem = existingItem
     ? { ...existingItem, quantity: targetQuantity }
@@ -407,8 +424,6 @@ export const updateCartItem = (
   const cart = getCart(sessionToken);
   const item = cart.items.find((cartItem) => cartItem.id === itemId);
   if (!item) return "not-found";
-  if (quantity > item.nft.available || quantity > item.nft.maxQuantity)
-    return "out-of-stock";
 
   const nextCart = {
     ...cart,

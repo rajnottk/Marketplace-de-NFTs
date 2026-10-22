@@ -69,12 +69,38 @@ const linkColumns: FooterLinkColumn[] = [
   },
 ];
 
-const socialNetworks: { label: string; href: string; icon: LucideIcon }[] = [
-  { label: "Facebook", href: "https://facebook.com", icon: Facebook },
-  { label: "Instagram", href: "https://instagram.com", icon: Instagram },
-  { label: "X (Twitter)", href: "https://x.com", icon: Twitter },
-  { label: "LinkedIn", href: "https://linkedin.com", icon: Linkedin },
-  { label: "YouTube", href: "https://youtube.com", icon: Youtube },
+// Lucide only ships outline icons: `filled` paints the glyph with currentColor (Instagram stays outlined).
+const socialNetworks: {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  filled: boolean;
+}[] = [
+  {
+    label: "Facebook",
+    href: "https://facebook.com",
+    icon: Facebook,
+    filled: true,
+  },
+  {
+    label: "Instagram",
+    href: "https://instagram.com",
+    icon: Instagram,
+    filled: false,
+  },
+  { label: "X (Twitter)", href: "https://x.com", icon: Twitter, filled: true },
+  {
+    label: "LinkedIn",
+    href: "https://linkedin.com",
+    icon: Linkedin,
+    filled: true,
+  },
+  {
+    label: "YouTube",
+    href: "https://youtube.com",
+    icon: Youtube,
+    filled: true,
+  },
 ];
 
 const compatibleWallets = ["MetaMask", "WalletConnect", "Coinbase"];
@@ -187,19 +213,31 @@ const AppFooter = () => {
           <div>
             <h2 className={columnTitleClassName}>Redes sociais</h2>
             <ul className="mt-4 flex gap-3">
-              {socialNetworks.map(({ label, href, icon: SocialIcon }) => (
-                <li key={label}>
-                  <a
-                    aria-label={label}
-                    className="grid h-10 w-10 place-items-center rounded-md border border-[#D28A4C] text-[#D28A4C] transition-colors hover:bg-[#D28A4C] hover:text-[#140D0A]"
-                    href={href}
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    <SocialIcon aria-hidden size={20} />
-                  </a>
-                </li>
-              ))}
+              {socialNetworks.map(
+                ({ label, href, icon: SocialIcon, filled }) => (
+                  <li key={label}>
+                    <a
+                      aria-label={label}
+                      className="group grid h-10 w-10 place-items-center rounded-md border border-[#D28A4C] text-[#D28A4C] transition-colors hover:bg-[#D28A4C] hover:text-[#140D0A]"
+                      href={href}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      <SocialIcon
+                        aria-hidden
+                        // YouTube's play triangle is the icon's last path: repaint it with the background so it stays visible when filled.
+                        className={
+                          label === "YouTube"
+                            ? "[&>path:last-child]:fill-[#241612] group-hover:[&>path:last-child]:fill-[#D28A4C] [&>path:last-child]:stroke-[#241612] group-hover:[&>path:last-child]:stroke-[#D28A4C]"
+                            : undefined
+                        }
+                        fill={filled ? "currentColor" : "none"}
+                        size={20}
+                      />
+                    </a>
+                  </li>
+                ),
+              )}
             </ul>
             <h2 className={`mt-8 ${columnTitleClassName}`}>
               Carteiras compatíveis

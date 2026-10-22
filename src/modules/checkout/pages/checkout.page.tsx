@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { CreditCard, LockKeyhole } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { CollectorForm } from "modules/checkout/components/collector-form";
+import { CheckoutSummary } from "modules/checkout/components/checkout-summary";
 import { getApiError } from "shared/api/api-error";
 import {
   createOrder,
@@ -10,173 +11,212 @@ import {
   getWallets,
   queryKeys,
 } from "shared/api/marketplace.api";
-import { Button } from "shared/components/ui/button";
-import { Card } from "shared/components/ui/card";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "shared/components/ui/breadcrumb";
 import { EmptyState } from "shared/components/ui/empty-state";
-import { formatEth } from "shared/lib/money";
+import type { Cart, Network, Quote } from "shared/contracts/marketplace";
 import { useSession } from "shared/hooks/use-session";
-import type { Network } from "shared/contracts/marketplace";
+
+const pageClassName = "mx-auto w-full max-w-[1200px] px-4 pb-16 pt-8 xl:px-0";
+const defaultNetwork: Network = "Ethereum";
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: session, isPending: isSessionPending } = useSession();
-  const { data: cart } = useQuery({
-    queryKey: queryKeys.cart,
-    queryFn: getCart,
-  });
-  const { data: wallets } = useQuery({
+  const { data: session, isLoading: isSessionLoading } = useSession();
+  const cartQuery = useQuery({ queryKey: queryKeys.cart, queryFn: getCart });
+  const walletsQuery = useQuery({
     queryKey: queryKeys.wallets,
     queryFn: getWallets,
     enabled: Boolean(session),
   });
-  const [network, setNetwork] = useState<Network>("Ethereum");
+  const [network, setNetwork] = useState<Network>(defaultNetwork);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("coinbase");
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const lastQuoteAttempt = useRef<string | null>(null);
+  const orderKey = useRef<string | null>(null);
+  const pendingQuote = useRef<Promise<Quote> | null>(null);
+  const isSubmitting = useRef(false);
+  const cart = cartQuery.data;
+  const currentQuote = cart?.quote ?? null;
   const quoteMutation = useMutation({
-    mutationFn: () => getQuote(cart?.quote?.coupon ?? null, network),
-  });
-  const orderMutation = useMutation({
-    mutationFn: () => createOrder(network, crypto.randomUUID()),
-    onSuccess: (order) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
-      navigate({ to: "/orders/$orderId", params: { orderId: order.id } });
+    mutationFn: ({
+      coupon,
+      quoteNetwork,
+    }: {
+      coupon: string | null;
+      quoteNetwork: Network;
+    }) => getQuote(coupon, quoteNetwork),
+    onSuccess: (quote) => {
+      setCouponError(() => null);
+      queryClient.setQueryData(queryKeys.cart, (previous: Cart | undefined) =>
+        previous ? { ...previous, quote } : previous,
+      );
+    },
+    onError: (error) => {
+      const apiError = getApiError(error);
+      setCouponError(() =>
+        apiError.code === "COUPON_INVALID" ? apiError.message : null,
+      );
     },
   });
-  const currentQuote = quoteMutation.data ?? cart?.quote;
-  const error = quoteMutation.error
-    ? getApiError(quoteMutation.error)
-    : orderMutation.error
-      ? getApiError(orderMutation.error)
-      : null;
+  const orderMutation = useMutation({
+    mutationFn: () => {
+      orderKey.current ??= crypto.randomUUID();
+      return createOrder(network, orderKey.current);
+    },
+    onSuccess: (order) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
+      void navigate({ to: "/orders/$orderId", params: { orderId: order.id } });
+    },
+  });
 
+  // Quote once on entry, since the stored quote does not include its network.
   useEffect(() => {
-    if (cart?.items.length && !currentQuote && !quoteMutation.isPending)
-      quoteMutation.mutate();
-  }, [cart?.items.length, currentQuote, quoteMutation]);
+    if (!cart?.items.length) return;
+    const quoteAttempt = `${cart.version}:${network}`;
+    if (lastQuoteAttempt.current === quoteAttempt) return;
+    lastQuoteAttempt.current = quoteAttempt;
+    pendingQuote.current = quoteMutation.mutateAsync({
+      coupon: currentQuote?.coupon ?? null,
+      quoteNetwork: network,
+    });
+    void pendingQuote.current.catch(() => undefined);
+  }, [
+    cart?.items.length,
+    cart?.version,
+    currentQuote?.coupon,
+    network,
+    quoteMutation,
+  ]);
 
-  const hasWallet = useMemo(() => (wallets?.length ?? 0) > 0, [wallets]);
-  if (isSessionPending)
+  const availableWallets = (walletsQuery.data ?? []).filter(
+    (wallet) => wallet.connectedState === "connected",
+  );
+  const wallet =
+    availableWallets.find((item) => item.isPrimary) ?? availableWallets[0];
+  const requestError =
+    cartQuery.error ??
+    walletsQuery.error ??
+    orderMutation.error ??
+    (couponError ? null : quoteMutation.error);
+  const handleConfirm = async () => {
+    if (isSubmitting.current) return;
+    isSubmitting.current = true;
+    setIsConfirming(() => true);
+    try {
+      // Honor a click during recalculation, using its completed quote for the order.
+      await pendingQuote.current;
+      await orderMutation.mutateAsync();
+    } catch {
+      // The mutations already expose their errors beside the purchase button.
+    } finally {
+      isSubmitting.current = false;
+      setIsConfirming(() => false);
+    }
+  };
+
+  if (isSessionLoading || cartQuery.isPending)
     return (
-      <main className="mx-auto max-w-7xl px-4 py-10 text-muted">
-        Recuperando sessão…
+      <main className={pageClassName}>
+        <p className="text-sm text-muted-foreground" role="status">
+          Carregando pagamento…
+        </p>
       </main>
     );
   if (!session)
     return (
-      <main className="mx-auto max-w-7xl px-4 py-10">
+      <main className={pageClassName}>
         <EmptyState
           actionLabel="Entrar"
           description="O pagamento e a emissão do recibo exigem uma conta de colecionador."
-          onAction={() => undefined}
+          onAction={() => void navigate({ to: "/auth/login" })}
           title="Entre para continuar"
         />
       </main>
     );
+  if (cartQuery.isError)
+    return (
+      <main className={pageClassName}>
+        <p className="text-danger" role="alert">
+          {getApiError(cartQuery.error).message}
+        </p>
+      </main>
+    );
   if (!cart?.items.length)
     return (
-      <main className="mx-auto max-w-7xl px-4 py-10">
+      <main className={pageClassName}>
         <EmptyState
           actionLabel="Ver carrinho"
           description="Adicione NFTs antes de iniciar o pagamento."
-          onAction={() => undefined}
+          onAction={() => void navigate({ to: "/cart" })}
           title="Seu carrinho está vazio"
         />
       </main>
     );
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:py-12">
-      <p className="text-xs uppercase tracking-[0.2em] text-accent">
-        Etapa final
-      </p>
-      <h1 className="mt-2 font-display text-3xl font-bold">PAGAMENTO</h1>
-      <section className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="space-y-5">
-          <Card className="space-y-4 p-5">
-            <h2 className="font-display text-base font-bold">
-              Dados do colecionador
-            </h2>
-            <p className="text-sm text-muted">
-              {session.user.displayName}
-              <br />
-              {session.user.email}
-            </p>
-          </Card>
-          <Card className="space-y-4 p-5">
-            <h2 className="font-display text-base font-bold">
-              Carteira e rede
-            </h2>
-            <label className="block text-xs text-muted" htmlFor="network">
-              Rede
-              <select
-                className="mt-2 h-11 w-full rounded-kurio border border-line bg-surface px-3 text-ink"
-                id="network"
-                onChange={(event) => setNetwork(event.target.value as Network)}
-                value={network}
-              >
-                <option>Ethereum</option>
-                <option>Polygon</option>
-                <option>Solana</option>
-              </select>
-            </label>
-            {hasWallet ? (
-              <p className="rounded-kurio bg-surface p-3 text-xs text-ink">
-                <CreditCard className="mr-2 inline text-accent" size={15} />
-                {wallets?.[0].label} · {wallets?.[0].address}
-              </p>
-            ) : (
-              <Link
-                className="text-xs text-accent underline"
-                to="/account/wallets"
-              >
-                Cadastrar uma carteira
-              </Link>
-            )}
-          </Card>
-        </div>
-        <Card className="h-fit space-y-5 p-5 lg:sticky lg:top-24">
-          <h2 className="font-display text-base font-bold">
-            Revisão do pedido
-          </h2>
-          <div className="space-y-2 text-xs">
-            {cart.items.map((item) => (
-              <div className="flex justify-between gap-4" key={item.id}>
-                <span className="text-muted">
-                  {item.quantity}× {item.nft.name}
-                </span>
-                <span>{formatEth(item.unitPriceEth)}</span>
-              </div>
-            ))}
-          </div>
-          <div className="border-y border-line py-4">
-            <div className="flex justify-between font-display text-sm font-bold">
-              <span>Total</span>
-              <span className="text-accent">
-                {currentQuote
-                  ? formatEth(currentQuote.totalEth)
-                  : "Calculando…"}
-              </span>
-            </div>
-          </div>
-          <Button
-            className="w-full"
-            disabled={!currentQuote || !hasWallet || orderMutation.isPending}
-            onClick={() => orderMutation.mutate()}
-            size="lg"
-          >
-            <LockKeyhole size={17} />
-            Confirmar compra
-          </Button>
-          <p className="text-[11px] leading-5 text-muted">
-            A cotação é validada antes do envio. Não criaremos uma segunda
-            compra em cliques repetidos.
-          </p>
-          {error ? (
-            <p className="text-xs text-danger" role="alert">
-              {error.message}
-            </p>
-          ) : null}
-        </Card>
-      </section>
+    <main className={pageClassName}>
+      <Breadcrumb>
+        <BreadcrumbList className="text-sm font-bold text-ink">
+          <BreadcrumbItem>
+            <BreadcrumbLink
+              className="hover:text-accent"
+              render={<Link to="/" />}
+            >
+              Início
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink
+              className="hover:text-accent"
+              render={<Link hash="catalog" to="/" />}
+            >
+              Mercado
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage className="font-bold">Pagamento</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+      <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.54fr)] lg:gap-8">
+        <CollectorForm
+          disabled={isConfirming}
+          isQuoting={quoteMutation.isPending}
+          network={network}
+          onConfirm={() => void handleConfirm()}
+          onNetworkChange={(value) => setNetwork(() => value)}
+          user={session.user}
+          wallet={wallet}
+        />
+        <CheckoutSummary
+          couponError={couponError}
+          error={requestError ? getApiError(requestError).message : null}
+          isOrdering={isConfirming}
+          isQuoting={quoteMutation.isPending}
+          items={cart.items}
+          onApplyCoupon={(coupon) => {
+            pendingQuote.current = quoteMutation.mutateAsync({
+              coupon: coupon || null,
+              quoteNetwork: network,
+            });
+            void pendingQuote.current.catch(() => undefined);
+          }}
+          onPaymentMethodChange={(method) => setPaymentMethod(() => method)}
+          paymentMethod={paymentMethod}
+          quote={currentQuote}
+        />
+      </div>
     </main>
   );
 };

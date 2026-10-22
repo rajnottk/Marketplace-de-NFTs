@@ -50,6 +50,14 @@ textarea {
   font: inherit;
 }
 
+/* Keep browser autofill suggestions consistent with manually entered values. */
+input:is(:autofill, :-webkit-autofill) {
+  -webkit-box-shadow: 0 0 0 1000px var(--color-canvas) inset;
+  box-shadow: 0 0 0 1000px var(--color-canvas) inset;
+  -webkit-text-fill-color: var(--color-foreground);
+  caret-color: var(--color-foreground);
+}
+
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,

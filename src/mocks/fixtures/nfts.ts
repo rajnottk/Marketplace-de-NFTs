@@ -2,14 +2,24 @@ import apeBucketHatImage from "assets/images/ape-bucket-hat.png";
 import apeHeadphonesImage from "assets/images/ape-headphones.png";
 import apeGreenJacketImage from "assets/images/ape-green-jacket.png";
 import apeTurtleneckImage from "assets/images/ape-turtleneck.png";
-import type { Network, Nft } from "shared/contracts/marketplace";
+import type { Network, Nft, NftEdition } from "shared/contracts/marketplace";
+
+// Fields filled in by `withDetailFields` (rating, edition, traits, long details...).
+type DetailFields =
+  | "rating"
+  | "reviewCount"
+  | "edition"
+  | "tokenNumber"
+  | "traits"
+  | "details";
+type BaseNft = Omit<Nft, DetailFields>;
 
 const millisecondsPerDay = 24 * 60 * 60 * 1000;
 
 const listedDaysAgo = (days: number) =>
   new Date(Date.now() - days * millisecondsPerDay).toISOString();
 
-const curatedNfts: Nft[] = [
+const curatedNfts: BaseNft[] = [
   {
     id: "emerald-ape-042",
     slug: "emerald-ape-042",
@@ -222,14 +232,14 @@ const catalogCategories = [
 const networks: Network[] = ["Ethereum", "Polygon", "Solana"];
 const rarities: Nft["rarity"][] = ["Comum", "Raro", "Épico", "Lendário"];
 
-const generateRandomNfts = (count: number): Nft[] => {
+const generateRandomNfts = (count: number): BaseNft[] => {
   const random = createRandomGenerator(nftGeneratorSeed);
   const pickFrom = <TOption>(options: readonly TOption[]) =>
     options[Math.floor(random() * options.length)];
   const randomInt = (min: number, max: number) =>
     min + Math.floor(random() * (max - min + 1));
   const usedIds = new Set(curatedNfts.map((nft) => nft.id));
-  const generatedNfts: Nft[] = [];
+  const generatedNfts: BaseNft[] = [];
 
   while (generatedNfts.length < count) {
     const theme = pickFrom(themesByImage);
@@ -268,10 +278,72 @@ const generateRandomNfts = (count: number): Nft[] => {
   return generatedNfts;
 };
 
-export const nftFixtures: Nft[] = [
+const detailFieldsSeed = 20261021;
+const editions: NftEdition[] = ["1/1", "1/10", "1/50", "open"];
+const traitPool = [
+  "Óculos",
+  "Esmeralda",
+  "Fones",
+  "Chapéu bucket",
+  "Gola alta",
+  "Jaqueta college",
+  "Corrente dourada",
+  "Brinco",
+  "Moletom",
+  "Fundo pastel",
+] as const;
+const editionLabels: Record<NftEdition, string> = {
+  "1/1": "1/1",
+  "1/10": "1/10",
+  "1/50": "1/50",
+  open: "aberta",
+};
+const artworkThemes = [
+  "identidade, movimento e luz em um mundo digital sem fronteiras",
+  "memória, estilo e cultura de rua reinterpretados em pixels",
+  "atitude, ritmo e a estética dos colecionáveis contemporâneos",
+] as const;
+const hexDigits = "0123456789ABCDEF";
+
+// Separate seeded generator: adding these fields does not change the NFTs generated above.
+const withDetailFields = (nfts: BaseNft[]): Nft[] => {
+  const random = createRandomGenerator(detailFieldsSeed);
+  const pickFrom = <TOption>(options: readonly TOption[]) =>
+    options[Math.floor(random() * options.length)];
+  const randomInt = (min: number, max: number) =>
+    min + Math.floor(random() * (max - min + 1));
+  const randomHex = (length: number) =>
+    Array.from({ length }, () => pickFrom([...hexDigits])).join("");
+
+  return nfts.map((nft) => {
+    const edition = pickFrom(editions);
+    const royaltyPercent = randomInt(3, 10);
+    const traits = [
+      ...new Set([pickFrom(traitPool), pickFrom(traitPool), nft.rarity]),
+    ];
+    return {
+      ...nft,
+      rating: randomInt(35, 50) / 10,
+      reviewCount: randomInt(3, 80),
+      edition,
+      tokenNumber: Number(nft.id.split("-").pop()) || randomInt(1, 9999),
+      traits,
+      details: {
+        longDescription: [
+          `${nft.name} é uma obra digital ${editionLabels[edition]} finalizada à mão da coleção ${nft.collection}. Cada atributo fica armazenado nos metadados do token e verificado na ${nft.network}. A obra explora ${pickFrom(artworkThemes)}.`,
+          `A propriedade inclui a arte em alta resolução, lançamentos exclusivos para colecionadores e um registro permanente de procedência registrada na rede. ${nft.artist} recebe ${royaltyPercent}% de direitos autorais nas vendas secundárias, apoiando novos trabalhos e lançamentos da comunidade.`,
+        ],
+        contractAddress: `0x${randomHex(4)}...${randomHex(4)}`,
+        royaltyPercent,
+      },
+    };
+  });
+};
+
+export const nftFixtures: Nft[] = withDetailFields([
   ...curatedNfts,
   ...generateRandomNfts(catalogNftCount - curatedNfts.length),
-];
+]);
 
 export {
   apeBucketHatImage,
