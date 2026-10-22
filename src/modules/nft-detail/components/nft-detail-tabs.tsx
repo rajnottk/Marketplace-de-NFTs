@@ -14,13 +14,19 @@ const sectionTextClassName = "mt-1 text-sm leading-7 text-[#CFB28C]";
 
 interface NftDetailTabsProps {
   nft: Nft;
+  value: "details" | "reviews";
+  onValueChange: (value: "details" | "reviews") => void;
 }
 
-const NftDetailTabs = ({ nft }: NftDetailTabsProps) => (
+const NftDetailTabs = ({ nft, value, onValueChange }: NftDetailTabsProps) => (
   <Tabs
     className="mx-3 mt-16 scroll-mt-6 md:mx-0"
-    defaultValue="details"
     id="nft-information"
+    onValueChange={(nextValue) => {
+      if (nextValue === "details" || nextValue === "reviews")
+        onValueChange(nextValue);
+    }}
+    value={value}
   >
     <TabsList
       aria-label="Informações do NFT"

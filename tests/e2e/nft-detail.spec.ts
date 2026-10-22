@@ -26,7 +26,14 @@ test("adapta os detalhes e preserva a galeria desktop", async ({
   await expect(page.getByRole("banner")).toHaveCount(0);
   await expect(
     page.getByRole("navigation", { name: "Navegação mobile" }),
-  ).toHaveCount(0);
+  ).toBeVisible();
+  const purchaseActions = page.locator("[data-nft-purchase-actions]");
+  const informationPanel = page.locator('section[aria-labelledby="nft-title"]');
+  await expect(informationPanel).toHaveCSS("border-bottom-left-radius", "0px");
+  await expect(informationPanel).toHaveCSS("border-bottom-right-radius", "0px");
+  await expect(informationPanel).toHaveCSS("border-top-left-radius", "31px");
+  await expect(purchaseActions).toHaveCSS("border-bottom-left-radius", "0px");
+  await expect(purchaseActions).toHaveCSS("border-bottom-right-radius", "0px");
   await expect(
     page.getByRole("button", { name: "Ampliar imagem" }),
   ).toHaveCount(0);
@@ -57,7 +64,9 @@ test("adapta os detalhes e preserva a galeria desktop", async ({
   await expect
     .poll(async () => (await information.boundingBox())!.y)
     .toBeLessThan(100);
-  await page.getByRole("tab", { name: /Avaliações de colecionadores/ }).click();
+  await expect(
+    page.getByRole("tab", { name: /Avaliações de colecionadores/ }),
+  ).toHaveAttribute("aria-selected", "true");
   await expect(
     page.getByText("Avaliações em manutenção", { exact: true }),
   ).toBeVisible();
@@ -91,8 +100,17 @@ test("adapta os detalhes e preserva a galeria desktop", async ({
   await page.getByRole("button", { name: "Aumentar quantidade" }).click();
   await page.getByRole("button", { name: "Comprar NFT", exact: true }).click();
   await expect(
-    page.getByText("Adicionado ao carrinho.", { exact: true }),
+    purchaseActions.getByText("Adicionado ao carrinho.", { exact: true }),
   ).toBeVisible();
+  const purchaseBounds = (await page
+    .getByRole("button", { name: "Comprar NFT", exact: true })
+    .boundingBox())!;
+  const messageBounds = (await purchaseActions
+    .getByText("Adicionado ao carrinho.", { exact: true })
+    .boundingBox())!;
+  expect(messageBounds.y).toBeGreaterThanOrEqual(
+    purchaseBounds.y + purchaseBounds.height,
+  );
   await page.getByRole("link", { name: "Ir para o carrinho" }).click();
   await expect(page).toHaveURL("/cart");
   await expect(page.getByRole("banner")).toHaveCount(0);

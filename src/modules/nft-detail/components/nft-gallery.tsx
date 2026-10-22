@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { ChevronLeft, Search } from "lucide-react";
-import { useNavigate, useRouter } from "@tanstack/react-router";
+import { Search } from "lucide-react";
+import { MobileBackButton } from "shared/components/molecules/mobile-back-button";
 import { NftFavoriteButton } from "modules/nft-detail/components/nft-favorite-button";
 import { ImageWithSkeleton } from "shared/components/molecules/image-with-skeleton";
 import {
@@ -21,8 +21,6 @@ interface NftGalleryProps {
 
 // The prototype shows the same artwork in all four thumbnails.
 const NftGallery = ({ imageUrl, name, nftId }: NftGalleryProps) => {
-  const router = useRouter();
-  const navigate = useNavigate();
   const galleryImages = Array.from(
     { length: galleryImageCount },
     () => imageUrl,
@@ -32,22 +30,9 @@ const NftGallery = ({ imageUrl, name, nftId }: NftGalleryProps) => {
 
   return (
     <>
-      <div className="rounded-t-[40px] bg-[#2F1D15] px-6 pb-8 pt-5 md:hidden">
+      <div className="bg-[#2F1D15] px-6 pb-8 pt-5 md:hidden">
         <div className="mb-2 flex items-center justify-between">
-          <button
-            aria-label="Voltar"
-            className="grid size-8 place-items-center rounded-full border border-[#D28A4C]/30 bg-[#2F1D15] text-[#CFB28C] hover:text-accent"
-            onClick={() => {
-              if (router.history.canGoBack()) {
-                router.history.back();
-                return;
-              }
-              void navigate({ to: "/" });
-            }}
-            type="button"
-          >
-            <ChevronLeft aria-hidden size={18} />
-          </button>
+          <MobileBackButton />
           <NftFavoriteButton compact nftId={nftId} />
         </div>
         <ImageWithSkeleton

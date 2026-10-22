@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { getApiError } from "shared/api/api-error";
 import { getNft, queryKeys } from "shared/api/marketplace.api";
@@ -42,7 +43,7 @@ const NftDetailSkeleton = () => (
   <main aria-busy="true" aria-label="Carregando NFT" className={pageClassName}>
     <Skeleton className="hidden h-6 w-40 md:block" />
     <div className={contentGridClassName}>
-      <div className="grid grid-cols-1 gap-4 rounded-t-[40px] bg-[#2F1D15] p-6 md:grid-cols-[101px_minmax(0,1fr)] md:gap-7 md:rounded-none md:bg-transparent md:p-0">
+      <div className="grid grid-cols-1 gap-4 bg-[#2F1D15] p-6 md:grid-cols-[101px_minmax(0,1fr)] md:gap-7 md:bg-transparent md:p-0">
         <div className="hidden flex-col gap-4 md:flex">
           {Array.from({ length: 4 }, (_, index) => (
             <Skeleton className="aspect-square w-full" key={index} />
@@ -64,6 +65,13 @@ const NftDetailSkeleton = () => (
 
 const NftDetailPage = () => {
   const { nftId } = useParams({ from: "/nfts/$nftId" });
+  const [selectedTab, setSelectedTab] = useState<{
+    nftId: string;
+    value: "details" | "reviews";
+  }>({ nftId, value: "details" });
+  const activeTab = selectedTab.nftId === nftId ? selectedTab.value : "details";
+  const changeTab = (value: "details" | "reviews") =>
+    setSelectedTab(() => ({ nftId, value }));
   const navigate = useNavigate();
   const nftQuery = useQuery({
     queryKey: queryKeys.nft(nftId),
@@ -101,9 +109,18 @@ const NftDetailPage = () => {
           name={nft.name}
           nftId={nft.id}
         />
-        <NftPurchasePanel key={`purchase-${nft.id}`} nft={nft} />
+        <NftPurchasePanel
+          key={`purchase-${nft.id}`}
+          nft={nft}
+          onShowReviews={() => changeTab("reviews")}
+        />
       </div>
-      <NftDetailTabs key={`tabs-${nft.id}`} nft={nft} />
+      <NftDetailTabs
+        key={`tabs-${nft.id}`}
+        nft={nft}
+        onValueChange={changeTab}
+        value={activeTab}
+      />
       <NftRecommendationsCarousel
         key={`recommendations-${nft.id}`}
         nftIds={[nft.id]}

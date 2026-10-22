@@ -221,7 +221,7 @@ test("mobile abre os filtros em modal e navega pela barra inferior", async ({
   const firstNftUrl = page.url();
   await expect(
     page.getByRole("navigation", { name: "Navegação mobile", exact: true }),
-  ).toHaveCount(0);
+  ).toBeVisible();
   await page.getByRole("button", { name: "Voltar", exact: true }).click();
   await expect(page).toHaveURL("/account/profile");
   await randomButton.click();

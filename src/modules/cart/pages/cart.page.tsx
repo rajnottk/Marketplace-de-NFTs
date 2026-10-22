@@ -28,10 +28,12 @@ import {
 } from "modules/cart/components/cart-table";
 import { useSession } from "shared/hooks/use-session";
 import { useAuthModal } from "modules/auth/hooks/use-auth-modal";
+import { MobileBackButton } from "shared/components/molecules/mobile-back-button";
 
-const pageClassName = "mx-auto w-full max-w-[1200px] px-4 pb-16 pt-8 xl:px-0";
+const pageClassName =
+  "mx-auto w-full max-w-[1200px] px-4 pb-10 pt-7 md:pb-16 md:pt-8 xl:px-0";
 const contentGridClassName =
-  "mt-4 grid gap-12 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-24";
+  "mt-5 grid gap-5 md:mt-4 md:gap-12 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-24";
 const defaultNetwork = "Ethereum";
 const couponErrorCode = "COUPON_INVALID";
 
@@ -190,7 +192,15 @@ const CartPage = () => {
 
   return (
     <main className={pageClassName}>
-      <CartBreadcrumb />
+      <div className="hidden md:block">
+        <CartBreadcrumb />
+      </div>
+      <div className="relative flex items-center md:hidden">
+        <MobileBackButton />
+        <h1 className="absolute inset-x-10 text-center text-lg font-bold text-ink">
+          Carrinho de NFTs
+        </h1>
+      </div>
       {cartItems.length ? (
         <div className={contentGridClassName}>
           <div className="min-w-0">

@@ -55,9 +55,10 @@ const RatingStars = ({ rating }: RatingStarsProps) => (
 
 interface NftPurchasePanelProps {
   nft: Nft;
+  onShowReviews: () => void;
 }
 
-const NftPurchasePanel = ({ nft }: NftPurchasePanelProps) => {
+const NftPurchasePanel = ({ nft, onShowReviews }: NftPurchasePanelProps) => {
   const queryClient = useQueryClient();
   const [quantity, setQuantity] = useState(1);
   // Edition selection is visual only: it does not change the price or the cart.
@@ -107,7 +108,7 @@ const NftPurchasePanel = ({ nft }: NftPurchasePanelProps) => {
   return (
     <section
       aria-labelledby="nft-title"
-      className="relative -mt-14 flex min-w-0 flex-col rounded-[32px] bg-[#241612] px-5 pt-7 md:mt-0 md:block md:rounded-none md:bg-transparent md:p-0"
+      className="relative -mt-14 flex min-w-0 flex-col rounded-t-[31px] bg-[#241612] px-5 pt-7 md:mt-0 md:block md:rounded-none md:bg-transparent md:p-0"
     >
       <div className="flex items-center justify-between gap-2 md:block">
         <h1
@@ -122,15 +123,19 @@ const NftPurchasePanel = ({ nft }: NftPurchasePanelProps) => {
           href="#nft-information"
           onClick={(event) => {
             event.preventDefault();
-            document
-              .getElementById("nft-information")
-              ?.scrollIntoView({
-                behavior: window.matchMedia("(prefers-reduced-motion: reduce)")
-                  .matches
-                  ? "instant"
-                  : "smooth",
-                block: "start",
-              });
+            onShowReviews();
+            requestAnimationFrame(() =>
+              document
+                .getElementById("nft-information")
+                ?.scrollIntoView({
+                  behavior: window.matchMedia(
+                    "(prefers-reduced-motion: reduce)",
+                  ).matches
+                    ? "instant"
+                    : "smooth",
+                  block: "start",
+                }),
+            );
           }}
         >
           <Star
@@ -193,7 +198,10 @@ const NftPurchasePanel = ({ nft }: NftPurchasePanelProps) => {
         ))}
       </div>
 
-      <div className="order-2 -mx-5 mt-8 flex flex-wrap items-center justify-between gap-4 rounded-[32px] bg-[#2F1D15]/30 px-5 pb-7 pt-5 md:order-none md:mx-0 md:mt-6 md:rounded-none md:bg-transparent md:p-0">
+      <div
+        className="order-2 -mx-5 mt-8 flex flex-wrap items-center justify-between gap-4 rounded-t-[31px] bg-[#2F1D15]/30 px-5 pb-7 pt-5 shadow-[0_0_20px_0_#0A060473] md:order-none md:mx-0 md:mt-6 md:rounded-none md:bg-transparent md:p-0 md:shadow-none"
+        data-nft-purchase-actions=""
+      >
         <div
           aria-label="Quantidade"
           className="flex items-center gap-2 md:gap-4"
@@ -254,17 +262,17 @@ const NftPurchasePanel = ({ nft }: NftPurchasePanelProps) => {
             <ShoppingCart aria-hidden size={20} />
           </Link>
         </div>
+        {addToCartMutation.isSuccess && (
+          <p className="w-full text-sm text-accent" role="status">
+            Adicionado ao carrinho.
+          </p>
+        )}
+        {error && (
+          <p className="w-full text-sm text-danger" role="alert">
+            {error.message}
+          </p>
+        )}
       </div>
-      {addToCartMutation.isSuccess && (
-        <p className="order-3 mb-4 mt-3 text-sm text-accent" role="status">
-          Adicionado ao carrinho.
-        </p>
-      )}
-      {error && (
-        <p className="order-3 mb-4 mt-3 text-sm text-danger" role="alert">
-          {error.message}
-        </p>
-      )}
 
       <dl className="mt-2 space-y-0.5 md:mt-4 md:space-y-1">
         <div className={cn("flex gap-2", detailTextClassName)}>
