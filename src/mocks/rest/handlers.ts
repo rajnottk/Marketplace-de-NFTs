@@ -24,7 +24,11 @@ import {
   updatePassword,
   updateProfile,
 } from "mocks/mock-database";
-import { networkSchema, walletSchema } from "shared/contracts/marketplace";
+import {
+  networkSchema,
+  newsletterSubscriptionSchema,
+  walletSchema,
+} from "shared/contracts/marketplace";
 
 const apiError = (
   code: string,
@@ -111,6 +115,14 @@ export const handlers = [
   http.get("/api/nfts", async ({ request }) => {
     await waitForMockNetwork();
     return HttpResponse.json(getCatalog(new URL(request.url).searchParams));
+  }),
+
+  http.post("/api/newsletter", async ({ request }) => {
+    await waitForMockNetwork();
+    const parsed = newsletterSubscriptionSchema.safeParse(await request.json());
+    if (!parsed.success)
+      return apiError("VALIDATION_ERROR", "Informe um e-mail válido.", 422);
+    return HttpResponse.json({ subscribed: true }, { status: 201 });
   }),
 
   http.get("/api/posts", async () => {

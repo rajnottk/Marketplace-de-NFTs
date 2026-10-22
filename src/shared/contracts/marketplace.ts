@@ -34,6 +34,13 @@ export const postSchema = z.object({
 });
 export type Post = z.infer<typeof postSchema>;
 
+export const newsletterSubscriptionSchema = z.object({
+  email: z.string().trim().email("Informe um e-mail válido."),
+});
+export type NewsletterSubscription = z.infer<
+  typeof newsletterSubscriptionSchema
+>;
+
 export const userSchema = z.object({
   id: z.string(),
   displayName: z.string(),

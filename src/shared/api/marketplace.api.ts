@@ -38,6 +38,10 @@ export const getNft = async (nftId: string) => {
   return response.data;
 };
 
+export const subscribeToNewsletter = async (email: string) => {
+  await apiClient.post("/newsletter", { email });
+};
+
 export const getPosts = async () => {
   const response = await apiClient.get<Post[]>("/posts");
   return response.data;

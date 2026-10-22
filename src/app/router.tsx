@@ -85,6 +85,16 @@ const learnRoute = createRoute({
   path: "/learn",
   component: () => <UnderConstructionPage title="Aprenda" />,
 });
+const helpRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/help",
+  component: () => <UnderConstructionPage title="Central de ajuda" />,
+});
+const collectionRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/collection",
+  component: () => <UnderConstructionPage title="Coleções" />,
+});
 const walletsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/account/wallets",
@@ -103,6 +113,8 @@ const routeTree = rootRoute.addChildren([
   walletsRoute,
   creatorsRoute,
   learnRoute,
+  helpRoute,
+  collectionRoute,
 ]);
 
 export const router = createRouter({ routeTree });
