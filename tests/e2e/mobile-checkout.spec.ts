@@ -249,7 +249,9 @@ test("aceita uma única carteira configurada pelo perfil e mantém o tamanho do 
   });
   const before = (await saveButton.boundingBox())!;
   await page.clock.install();
-  await page.clock.pauseAt(new Date(Date.now() + 100));
+  // Pause relative to the page clock with enough margin to never land in the past under load.
+  const pageNow = await page.evaluate(() => Date.now());
+  await page.clock.pauseAt(new Date(pageNow + 1_000));
   await saveButton.evaluate((element: HTMLButtonElement) => element.click());
   await expect(saveButton).toHaveAttribute("aria-busy", "true");
   await expect(saveButton).toHaveText("Salvar carteira");

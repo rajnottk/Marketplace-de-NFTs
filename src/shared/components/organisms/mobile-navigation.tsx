@@ -8,7 +8,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { Scanner } from "iconsax-react";
 import { getCart, getCatalog, queryKeys } from "shared/api/marketplace.api";
-import { Button, buttonVariants } from "shared/components/ui/button";
+import { Button } from "shared/components/ui/button";
+import { buttonVariants } from "shared/components/ui/button.variants";
 import { useSession } from "shared/hooks/use-session";
 import { cn } from "shared/lib/utils";
 

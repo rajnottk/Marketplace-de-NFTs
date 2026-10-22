@@ -164,7 +164,8 @@ const CheckoutSummary = ({
       </fieldset>
       <button
         aria-busy={isOrdering}
-        className="mt-6 h-12 w-full rounded-md bg-primary text-base font-bold text-primary-foreground transition-colors hover:bg-accent-strong"
+        className="mt-6 h-12 w-full rounded-md bg-primary text-base font-bold text-primary-foreground transition-colors hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={isOrdering}
         form="collector-form"
         type="submit"
       >

@@ -38,8 +38,9 @@ export const useAuthSubmission = (
       ])
         queryClient.removeQueries({ queryKey: key });
       queryClient.setQueryData(queryKeys.session, session);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.cart });
+      // Navigate right away: awaiting the cart refetch first let a late redirect undo navigations the user already made.
       onAuthenticated(mode);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
     },
   });
 };

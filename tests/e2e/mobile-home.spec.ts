@@ -32,7 +32,9 @@ test("pesquisa só pelo título com debounce e preserva os filtros", async ({
       requests.push(url.searchParams.get("q")!);
   });
   await page.clock.install();
-  await page.clock.pauseAt(new Date(Date.now() + 100));
+  // Pause relative to the page clock (not Node's) with enough margin to never land in the past under load.
+  const pageNow = await page.evaluate(() => Date.now());
+  await page.clock.pauseAt(new Date(pageNow + 1_000));
   await input.fill("Emer");
   await page.clock.runFor(200);
   await input.fill("emerald");

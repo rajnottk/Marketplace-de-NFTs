@@ -27,7 +27,12 @@ import {
   nftFixtures,
 } from "mocks/fixtures/nfts";
 import type { VerifiedFirebaseIdentity } from "mocks/auth/verify-firebase-token";
-import { persistMockState } from "mocks/persistence";
+import { mockStatePersistenceKey, persistMockState } from "mocks/persistence";
+import {
+  publishNftUpdated,
+  publishOrderUpdated,
+} from "mocks/realtime/event-bus";
+import { getMockScenario, pendingConfirmationDelayMs } from "mocks/scenarios";
 
 interface MockUser extends User {
   passwordHash: string;
@@ -38,13 +43,13 @@ interface MockState {
   carts: Record<string, Cart>;
   favorites: Record<string, string[]>;
   nfts: Nft[];
-  orders: Record<string, Order>;
+  orders: Record<string, MockOrder>;
   sessions: Record<string, string>;
   users: MockUser[];
   wallets: Record<string, Wallet[]>;
 }
 
-const persistenceKey = "kurio.mock-state.v5";
+const persistenceKey = mockStatePersistenceKey;
 const hashSeed = 17;
 const hashMultiplier = 31;
 
@@ -70,15 +75,38 @@ const defaultUser: MockUser = {
   sessionVersion: 1,
 };
 
+// Second seeded collector, so per-user isolation can be exercised without signing up.
+const secondUser: MockUser = {
+  id: "collector-lia",
+  displayName: "Lia Coleciona",
+  username: "lia.coleciona",
+  ensName: "lia",
+  ensSuffix: ".eth",
+  walletAlias: "Carteira da Lia",
+  email: "lia@kurio.test",
+  passwordHash: hashPassword("Kurio#2026"),
+  avatarUrl: apeTurtleneckImage,
+  sessionVersion: 1,
+};
+
 const mockUserSchema = userSchema.extend({
   passwordHash: z.string(),
   firebaseUid: z.string().optional(),
 });
+// Orders keep their owner and the request fingerprint server-side only (never part of the public Order contract).
+const mockOrderSchema = orderSchema.extend({
+  ownerId: z.string(),
+  requestFingerprint: z.string(),
+});
+type MockOrder = z.infer<typeof mockOrderSchema>;
+
+const toPublicOrder = (order: MockOrder): Order => orderSchema.parse(order);
+
 const mockStateSchema = z.object({
   carts: z.record(z.string(), cartSchema),
   favorites: z.record(z.string(), z.array(z.string())),
   nfts: z.array(nftSchema),
-  orders: z.record(z.string(), orderSchema),
+  orders: z.record(z.string(), mockOrderSchema),
   sessions: z.record(z.string(), z.string()),
   users: z.array(mockUserSchema),
   wallets: z.record(z.string(), z.array(walletSchema)),
@@ -87,12 +115,19 @@ const mockStateSchema = z.object({
 const emptyCart = (): Cart => ({ items: [], quote: null, version: 0 });
 
 const createInitialState = (): MockState => ({
-  carts: { guest: emptyCart(), [defaultUser.id]: emptyCart() },
-  favorites: { [defaultUser.id]: ["emerald-ape-042"] },
+  carts: {
+    guest: emptyCart(),
+    [defaultUser.id]: emptyCart(),
+    [secondUser.id]: emptyCart(),
+  },
+  favorites: {
+    [defaultUser.id]: ["emerald-ape-042"],
+    [secondUser.id]: ["neon-vessel-552"],
+  },
   nfts: nftFixtures.map((nft) => ({ ...nft })),
   orders: {},
   sessions: { "session-collector-ana": defaultUser.id },
-  users: [{ ...defaultUser }],
+  users: [{ ...defaultUser }, { ...secondUser }],
   wallets: {
     [defaultUser.id]: [
       {
@@ -100,6 +135,16 @@ const createInitialState = (): MockState => ({
         label: "Carteira principal",
         address: "0x1af9...7bd2",
         network: "Ethereum",
+        isPrimary: true,
+        connectedState: "connected",
+      },
+    ],
+    [secondUser.id]: [
+      {
+        id: "wallet-lia-main",
+        label: "Carteira da Lia",
+        address: "0x9c3e...41ab",
+        network: "Polygon",
         isPrimary: true,
         connectedState: "connected",
       },
@@ -226,6 +271,9 @@ export const resetMockState = () => {
     window.localStorage.removeItem(persistenceKey);
   state = createInitialState();
 };
+
+export const getOwnerForToken = (sessionToken: string | null) =>
+  getOwner(sessionToken);
 
 export const getSession = (sessionToken: string | null): Session | null => {
   const user = getUserById(getOwner(sessionToken));
@@ -446,6 +494,7 @@ export const addToCart = (
   const cart = getCart(sessionToken);
   const nft = getNftById(nftId);
   if (!nft) return "not-found";
+  if (nft.available === 0) return "sold-out";
   const existingItem = cart.items.find((item) => item.nft.id === nftId);
   const targetQuantity = (existingItem?.quantity ?? 0) + quantity;
 
@@ -501,12 +550,17 @@ export const removeCartItem = (sessionToken: string | null, itemId: string) => {
   return nextCart;
 };
 
+const validCoupon = "KURIO10";
+// Deterministic fixture for the "expired coupon" scenario.
+const expiredCoupon = "KURIO-EXPIRADO";
+
 export const quoteCart = (
   sessionToken: string | null,
   coupon: string | null,
   network: Network,
 ) => {
-  if (coupon && coupon !== "KURIO10") return "invalid-coupon";
+  if (coupon === expiredCoupon) return "expired-coupon";
+  if (coupon && coupon !== validCoupon) return "invalid-coupon";
   const owner = getOwner(sessionToken);
   const cart = getCart(sessionToken);
   const quote = calculateQuote(cart, coupon, network);
@@ -571,38 +625,189 @@ export const saveWallet = (
   return normalizedWallets;
 };
 
+const isQuoteCurrent = (cart: Cart, network: Network) =>
+  Boolean(cart.quote) &&
+  cart.quote!.cartVersion === cart.version &&
+  new Date(cart.quote!.expiresAt).getTime() > Date.now() &&
+  calculateQuote(cart, cart.quote!.coupon, network).totalEth ===
+    cart.quote!.totalEth;
+
+// Idempotent order creation:
+// - same key + same owner + same request (network + reviewed cart version) → the same order;
+// - same key reused by another user or with a different request → idempotency conflict;
+// - a missing, expired or outdated quote (cart or network changed) → stale-quote, so the user must review again.
 export const createOrder = (
   sessionToken: string | null,
   network: Network,
+  cartVersion: number,
   idempotencyKey: string,
 ) => {
   const owner = getOwner(sessionToken);
   const user = getUserById(owner);
   if (!user) return "unauthorized";
-  const existingOrder = Object.values(state.orders).find(
-    (order) => order.id === `order-${idempotencyKey}`,
-  );
-  if (existingOrder) return existingOrder;
+  const requestFingerprint = `${network}|${cartVersion}`;
+  const existingOrder = state.orders[`order-${idempotencyKey}`];
+  if (existingOrder) {
+    if (
+      existingOrder.ownerId !== owner ||
+      existingOrder.requestFingerprint !== requestFingerprint
+    )
+      return "idempotency-conflict";
+    return { order: toPublicOrder(existingOrder), isNew: false as const };
+  }
 
   const cart = getCart(sessionToken);
-  const quote = cart.quote ?? calculateQuote(cart, null, network);
   if (!cart.items.length) return "empty-cart";
-  const order: Order = {
+  if (cart.items.some((item) => getNftById(item.nft.id)?.available === 0))
+    return "sold-out";
+  if (cart.version !== cartVersion || !isQuoteCurrent(cart, network))
+    return "stale-quote";
+  const { payment } = getMockScenario();
+  const order: MockOrder = {
     id: `order-${idempotencyKey}`,
-    status: "confirmed",
+    status: payment,
     transactionRef: `0x${crypto.randomUUID().replaceAll("-", "").slice(0, 24)}`,
-    snapshot: { items: cart.items, quote, network },
+    snapshot: { items: cart.items, quote: cart.quote!, network },
     version: 1,
+    ownerId: owner,
+    requestFingerprint,
   };
+  // Only a confirmed purchase leaves the cart; declined and pending orders keep the items.
   commitState({
     ...state,
     orders: { ...state.orders, [order.id]: order },
-    carts: { ...state.carts, [owner]: emptyCart() },
+    carts:
+      order.status === "confirmed"
+        ? { ...state.carts, [owner]: removePurchasedItems(cart, order) }
+        : state.carts,
   });
-  return order;
+  if (order.status === "pending") schedulePendingConfirmation(order.id);
+  return { order: toPublicOrder(order), isNew: true as const };
 };
 
-export const getOrder = (orderId: string) => state.orders[orderId] ?? null;
+// Removes exactly the purchased items and quantities (the cart may have changed since the order snapshot).
+const removePurchasedItems = (cart: Cart, order: MockOrder): Cart => {
+  const purchasedQuantities = new Map(
+    order.snapshot.items.map((item) => [item.nft.id, item.quantity]),
+  );
+  const items = cart.items
+    .map((item) => ({
+      ...item,
+      quantity: item.quantity - (purchasedQuantities.get(item.nft.id) ?? 0),
+    }))
+    .filter((item) => item.quantity > 0);
+  return { ...cart, items, quote: null, version: cart.version + 1 };
+};
+
+const pendingConfirmations = new Map<string, ReturnType<typeof setTimeout>>();
+
+// The simulated payment processor confirms pending orders asynchronously and notifies the owner via Socket.IO.
+export const confirmPendingOrder = (orderId: string) => {
+  pendingConfirmations.delete(orderId);
+  const order = state.orders[orderId];
+  if (!order || order.status !== "pending") return;
+  const confirmedOrder: MockOrder = {
+    ...order,
+    status: "confirmed",
+    version: order.version + 1,
+  };
+  const ownerCart = state.carts[order.ownerId] ?? emptyCart();
+  commitState({
+    ...state,
+    orders: { ...state.orders, [orderId]: confirmedOrder },
+    carts: {
+      ...state.carts,
+      [order.ownerId]: removePurchasedItems(ownerCart, confirmedOrder),
+    },
+  });
+  publishOrderUpdated(order.ownerId, toPublicOrder(confirmedOrder));
+};
+
+const schedulePendingConfirmation = (orderId: string) => {
+  if (pendingConfirmations.has(orderId)) return;
+  pendingConfirmations.set(
+    orderId,
+    setTimeout(() => confirmPendingOrder(orderId), pendingConfirmationDelayMs),
+  );
+};
+
+export const confirmAllPendingOrders = () => {
+  Object.values(state.orders)
+    .filter((order) => order.status === "pending")
+    .forEach((order) => confirmPendingOrder(order.id));
+};
+
+// After a reload the timers are gone: resume the confirmation of persisted pending orders.
+export const resumePendingConfirmations = () => {
+  Object.values(state.orders)
+    .filter((order) => order.status === "pending")
+    .forEach((order) => schedulePendingConfirmation(order.id));
+};
+
+// Scenario action: a new price or availability while users browse or hold the NFT in their cart.
+const updateNft = (
+  nftId: string,
+  changes: Partial<Pick<Nft, "priceEth" | "available">>,
+) => {
+  const nft = getNftById(nftId);
+  if (!nft) return null;
+  const updatedNft: Nft = { ...nft, ...changes, version: nft.version + 1 };
+  const carts = Object.fromEntries(
+    Object.entries(state.carts).map(([owner, cart]) => {
+      if (!cart.items.some((item) => item.nft.id === nftId))
+        return [owner, cart];
+      const items = cart.items.map((item) =>
+        item.nft.id === nftId
+          ? {
+              ...item,
+              nft: updatedNft,
+              unitPriceEth: updatedNft.priceEth,
+              itemVersion: updatedNft.version,
+            }
+          : item,
+      );
+      return [
+        owner,
+        { ...cart, items, quote: null, version: cart.version + 1 },
+      ];
+    }),
+  );
+  commitState({
+    ...state,
+    nfts: state.nfts.map((candidate) =>
+      candidate.id === nftId ? updatedNft : candidate,
+    ),
+    carts,
+  });
+  publishNftUpdated(updatedNft);
+  return updatedNft;
+};
+
+export const changeNftPrice = (nftId: string, priceEth: string) =>
+  updateNft(nftId, { priceEth: new Decimal(priceEth).toFixed(4) });
+
+export const markNftSoldOut = (nftId: string) =>
+  updateNft(nftId, { available: 0 });
+
+// Scenario action: every active session expires (the next authenticated request answers 401).
+export const expireAllSessions = () => {
+  commitState({ ...state, sessions: {} });
+};
+
+export const listNftOptions = () =>
+  state.nfts.map((nft) => ({
+    id: nft.id,
+    name: nft.name,
+    priceEth: nft.priceEth,
+    available: nft.available,
+  }));
+
+// Orders are private: another user's order is reported as not found (its existence is not revealed).
+export const getOrder = (sessionToken: string | null, orderId: string) => {
+  const order = state.orders[orderId];
+  if (!order || order.ownerId !== getOwner(sessionToken)) return null;
+  return toPublicOrder(order);
+};
 
 export const updateProfile = (
   sessionToken: string | null,

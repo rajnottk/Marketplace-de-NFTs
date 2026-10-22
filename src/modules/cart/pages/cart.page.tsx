@@ -35,7 +35,8 @@ const pageClassName =
 const contentGridClassName =
   "mt-5 grid gap-5 md:mt-4 md:gap-12 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-24";
 const defaultNetwork = "Ethereum";
-const couponErrorCode = "COUPON_INVALID";
+// Coupon rejections shown next to the promo code field.
+const couponErrorCodes = new Set(["COUPON_INVALID", "COUPON_EXPIRED"]);
 
 const CartBreadcrumb = () => (
   <Breadcrumb>
@@ -90,16 +91,19 @@ const CartPage = () => {
     onSuccess: (quote, coupon) => {
       setAppliedCoupon(coupon);
       setCouponError(null);
+      // A quote that finished after the cart changed belongs to an older cart version: drop it so it gets recalculated.
       queryClient.setQueryData(
         queryKeys.cart,
         (currentCart: Cart | undefined) =>
-          currentCart ? { ...currentCart, quote } : currentCart,
+          currentCart && currentCart.version === quote.cartVersion
+            ? { ...currentCart, quote }
+            : currentCart,
       );
     },
     onError: (error) => {
       const apiError = getApiError(error);
       setCouponError(
-        apiError.code === couponErrorCode ? apiError.message : null,
+        couponErrorCodes.has(apiError.code) ? apiError.message : null,
       );
     },
   });
@@ -122,6 +126,9 @@ const CartPage = () => {
 
   const cart = cartQuery.data;
   const cartItems = cart?.items ?? [];
+  // Only a quote for the current cart version is shown or used.
+  const currentQuote =
+    cart?.quote && cart.quote.cartVersion === cart.version ? cart.quote : null;
   // After a reload the page state is empty, but the stored quote still knows which coupon was applied.
   const activeCoupon = appliedCoupon ?? cart?.quote?.coupon ?? null;
 
@@ -129,14 +136,14 @@ const CartPage = () => {
   useEffect(() => {
     if (
       !cart?.items.length ||
-      cart.quote ||
+      currentQuote ||
       pendingQuote.current ||
       lastQuotedCartVersion.current === cart.version
     )
       return;
     lastQuotedCartVersion.current = cart.version;
     void requestQuote(activeCoupon).catch(() => undefined);
-  }, [cart, activeCoupon, requestQuote]);
+  }, [cart, currentQuote, activeCoupon, requestQuote]);
 
   // Cart changes clear the stored quote: pin the active coupon first so the recalculation keeps it.
   const changeQuantity = (itemId: string, quantity: number) => {
@@ -222,7 +229,7 @@ const CartPage = () => {
             isQuoting={quoteMutation.isPending || isSessionLoading}
             onApplyCoupon={handleApplyCoupon}
             onCheckout={() => void handleCheckout()}
-            quote={cart?.quote ?? null}
+            quote={currentQuote}
           />
         </div>
       ) : (

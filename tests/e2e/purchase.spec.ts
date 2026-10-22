@@ -1,10 +1,16 @@
 import { expect, test } from "@playwright/test";
 import { completeCollectorLogin } from "../helpers/auth";
 
-test("preserva o carrinho do visitante ao autenticar e conclui uma compra", async ({
+test("compra a partir do catálogo, preserva o carrinho do visitante ao autenticar e chega ao recibo", async ({
   page,
 }, testInfo) => {
-  await page.goto("/nfts/emerald-ape-042");
+  // Start from the catalog (search keeps the card on the first page regardless of the listing date order).
+  await page.goto("/?q=emerald%20ape");
+  await page
+    .getByRole("region", { name: "Explorar NFTs", exact: true })
+    .getByRole("link", { name: "Ver Emerald Ape #042", exact: true })
+    .click();
+  await expect(page).toHaveURL("/nfts/emerald-ape-042");
   await page.getByRole("button", { name: /^(Comprar|Comprar NFT)$/ }).click();
   await expect(
     page.getByRole("link", {

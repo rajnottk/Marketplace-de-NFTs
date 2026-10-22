@@ -118,9 +118,13 @@ export const register = async (
   return response.data;
 };
 
+// Best effort on the server; the social (Firebase) session is always signed out, even if the API call fails.
 export const logout = async () => {
-  await apiClient.post("/auth/logout");
-  await signOutFirebase().catch(() => undefined);
+  try {
+    await apiClient.post("/auth/logout");
+  } finally {
+    await signOutFirebase().catch(() => undefined);
+  }
 };
 
 export const getFavorites = async () => {
@@ -135,10 +139,14 @@ export const toggleFavorite = async (nftId: string) => {
   return response.data.ids;
 };
 
-export const createOrder = async (network: Network, idempotencyKey: string) => {
+export const createOrder = async (
+  network: Network,
+  cartVersion: number,
+  idempotencyKey: string,
+) => {
   const response = await apiClient.post<Order>(
     "/orders",
-    { network },
+    { network, cartVersion },
     { headers: { "idempotency-key": idempotencyKey } },
   );
   return response.data;

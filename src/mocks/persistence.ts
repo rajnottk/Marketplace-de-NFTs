@@ -1,3 +1,6 @@
+// Single source for the localStorage key of the mock database (also used by the Playwright helpers).
+export const mockStatePersistenceKey = "kurio.mock-state.v7";
+
 export class MockPersistenceError extends Error {
   readonly code: "BROWSER_STORAGE_FULL" | "BROWSER_STORAGE_UNAVAILABLE";
 

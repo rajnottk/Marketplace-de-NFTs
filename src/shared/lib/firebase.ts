@@ -28,7 +28,17 @@ export const getExistingFirebaseAuth = () => {
   return app ? getAuth(app) : null;
 };
 
+// After a reload no Firebase app is initialized yet, but the social session is still persisted (IndexedDB):
+// initialize it when configured so signOut really clears it.
 export const signOutFirebase = async () => {
-  const auth = getExistingFirebaseAuth();
-  if (auth) await signOut(auth);
+  let auth = getExistingFirebaseAuth();
+  if (!auth) {
+    try {
+      auth = getFirebaseAuth();
+    } catch (error) {
+      if (error instanceof AuthSetupError) return;
+      throw error;
+    }
+  }
+  await signOut(auth);
 };

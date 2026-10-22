@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { completeCollectorLogin, openLogin } from "../helpers/auth";
+import { markNftSoldOut } from "../helpers/mocks";
 
 const fillRequiredFields = async (page: Page) => {
   await page.getByLabel("Nome de usuário").fill("ana-coleciona");
@@ -371,4 +372,111 @@ test("mantém as cores do tema no estado de autofill do navegador", async ({
     /rgb\(22, 14, 10\).*1000px.*inset/,
   );
   await client.detach();
+});
+
+test("cliques repetidos em Confirmar compra criam um único pedido", async ({
+  page,
+}) => {
+  await fillRequiredFields(page);
+  await page
+    .getByRole("group", { name: "Carteira e rede" })
+    .getByRole("radio", { name: "MetaMask", exact: true })
+    .check();
+  const orderRequests: { key: string | null; body: string | null }[] = [];
+  page.on("request", (request) => {
+    if (
+      request.method() === "POST" &&
+      new URL(request.url()).pathname === "/api/orders"
+    ) {
+      orderRequests.push({
+        key: request.headers()["idempotency-key"] ?? null,
+        body: request.postData(),
+      });
+    }
+  });
+
+  // Three clicks in the same task, before React can re-render the disabled state.
+  await page
+    .getByRole("button", { name: "Confirmar compra" })
+    .evaluate((button: HTMLButtonElement) => {
+      button.click();
+      button.click();
+      button.click();
+    });
+
+  await expect(
+    page.getByRole("dialog", { name: "Compra confirmada" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("dialog", { name: "Compra confirmada" }),
+  ).toHaveCount(1);
+  expect(orderRequests).toHaveLength(1);
+  expect(orderRequests[0].key).toBeTruthy();
+  expect(JSON.parse(orderRequests[0].body ?? "{}")).toMatchObject({
+    network: "Ethereum",
+    cartVersion: expect.any(Number),
+  });
+});
+
+test("exige nova confirmação quando o carrinho muda depois da revisão", async ({
+  page,
+}) => {
+  await fillRequiredFields(page);
+  await page
+    .getByRole("group", { name: "Carteira e rede" })
+    .getByRole("radio", { name: "MetaMask", exact: true })
+    .check();
+
+  // Another tab changes the cart after the user reviewed the summary.
+  await page.evaluate(async () => {
+    const headers = {
+      "content-type": "application/json",
+      "x-session-token":
+        window.localStorage.getItem("kurio.session-token") ?? "",
+    };
+    const cart = await (await fetch("/api/cart", { headers })).json();
+    await fetch(`/api/cart/${cart.items[0].id}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ quantity: 2 }),
+    });
+  });
+
+  await page.getByRole("button", { name: "Confirmar compra" }).click();
+  await expect(
+    page.getByText(
+      /Os valores do pedido mudaram\. Revise o resumo e confirme novamente\./,
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("dialog", { name: "Compra confirmada" }),
+  ).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Confirmar compra" }).click();
+  const modal = page.getByRole("dialog", { name: "Compra confirmada" });
+  await expect(modal).toBeVisible();
+  await expect(
+    modal.getByText(/2\s*×|x\s*2|Quantidade:?\s*2/i).first(),
+  ).toBeVisible();
+});
+
+test("edição esgotada durante a compra avisa e impede o pedido", async ({
+  page,
+}) => {
+  await fillRequiredFields(page);
+  await page
+    .getByRole("group", { name: "Carteira e rede" })
+    .getByRole("radio", { name: "MetaMask", exact: true })
+    .check();
+  await markNftSoldOut(page, "emerald-ape-042");
+  await expect(page.locator("[data-realtime-notice]")).toContainText(
+    "Emerald Ape #042 esgotou",
+  );
+  await page.getByRole("button", { name: "Confirmar compra" }).click();
+  await expect(
+    page.getByText(/Uma edição do seu carrinho esgotou durante a compra/),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("dialog", { name: "Compra confirmada" }),
+  ).toHaveCount(0);
 });

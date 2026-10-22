@@ -351,7 +351,9 @@ test("navega pelas configurações e salva uma carteira", async ({
     "Carteira salva com sucesso.",
   );
   expect(walletWrites).toEqual(["POST"]);
-  await page.clock.pauseAt(new Date(Date.now() + 100));
+  // Pause relative to the page clock (not Node's): the auto-close timer started on save, so keep the offset small.
+  const pageNow = await page.evaluate(() => Date.now());
+  await page.clock.pauseAt(new Date(pageNow + 100));
   await page.clock.runFor(1000);
   await expect(secondary.locator("form")).toBeVisible();
   await page.clock.runFor(1100);

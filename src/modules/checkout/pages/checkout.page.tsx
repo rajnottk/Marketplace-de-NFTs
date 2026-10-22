@@ -10,6 +10,7 @@ import {
   type PurchaseConfirmation,
 } from "modules/orders/components/order-confirmation-modal";
 import { useAuthModal } from "modules/auth/hooks/use-auth-modal";
+import { usePendingOrder } from "modules/checkout/hooks/use-pending-order";
 import { getApiError } from "shared/api/api-error";
 import {
   createOrder,
@@ -33,6 +34,19 @@ import { useIsMobile } from "shared/hooks/use-is-mobile";
 
 const pageClassName = "mx-auto w-full max-w-[1200px] px-4 pb-16 pt-8 xl:px-0";
 const defaultNetwork: Network = "Ethereum";
+const walletLabels: Record<string, string> = {
+  walletconnect: "WalletConnect",
+  metamask: "MetaMask",
+  coinbase: "Coinbase Wallet",
+};
+const declinedMessage =
+  "Pagamento não aprovado. Revise a carteira e tente novamente.";
+const soldOutMessage =
+  "Uma edição do seu carrinho esgotou durante a compra. Revise o carrinho.";
+const pendingMessage =
+  "Pagamento em processamento. A confirmação aparece aqui assim que a rede confirmar a transação.";
+// Errors with no server answer: the order may exist, so the retry must repeat the exact same request.
+const ambiguousErrorCodes = new Set(["TIMEOUT", "NETWORK_ERROR"]);
 
 const CheckoutPage = () => {
   const isMobile = useIsMobile();
@@ -55,9 +69,23 @@ const CheckoutPage = () => {
   );
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const lastQuoteAttempt = useRef<string | null>(null);
-  const orderKey = useRef<string | null>(null);
+  // Idempotency key bound to what the user reviewed: retries of the same request reuse it, a new request gets a new key.
+  const orderAttempt = useRef<{ key: string; fingerprint: string } | null>(
+    null,
+  );
   const pendingQuote = useRef<Promise<Quote> | null>(null);
   const isSubmitting = useRef(false);
+  const ambiguousAttempt = useRef<{
+    orderNetwork: Network;
+    cartVersion: number;
+  } | null>(null);
+  const {
+    pendingOrder,
+    pendingWalletLabel,
+    isTrackingPendingOrder,
+    trackPendingOrder,
+    clearPendingOrder,
+  } = usePendingOrder(session?.user.id);
   const cart = cartQuery.data;
   const currentQuote = cart?.quote ?? null;
   const quoteMutation = useMutation({
@@ -77,7 +105,9 @@ const CheckoutPage = () => {
     onError: (error) => {
       const apiError = getApiError(error);
       setCouponError(() =>
-        apiError.code === "COUPON_INVALID" ? apiError.message : null,
+        apiError.code === "COUPON_INVALID" || apiError.code === "COUPON_EXPIRED"
+          ? apiError.message
+          : null,
       );
     },
   });
@@ -94,24 +124,45 @@ const CheckoutPage = () => {
     [calculateQuote],
   );
   const orderMutation = useMutation({
-    mutationFn: () => {
-      orderKey.current ??= crypto.randomUUID();
-      return createOrder(network, orderKey.current);
+    mutationFn: ({
+      orderNetwork,
+      cartVersion,
+    }: {
+      orderNetwork: Network;
+      cartVersion: number;
+    }) => {
+      const fingerprint = `${orderNetwork}|${cartVersion}`;
+      if (orderAttempt.current?.fingerprint !== fingerprint)
+        orderAttempt.current = { key: crypto.randomUUID(), fingerprint };
+      return createOrder(orderNetwork, cartVersion, orderAttempt.current.key);
+    },
+    onError: (error, variables) => {
+      const { code } = getApiError(error);
+      // No answer (timeout/offline): the order may already exist, so keep the key and repeat the same request.
+      ambiguousAttempt.current = ambiguousErrorCodes.has(code)
+        ? variables
+        : null;
+      // Terminal rejections: the next attempt is a new request.
+      if (
+        code === "IDEMPOTENCY_CONFLICT" ||
+        code === "QUOTE_OUTDATED" ||
+        code === "EDITION_SOLD_OUT"
+      )
+        orderAttempt.current = null;
+      if (code === "QUOTE_OUTDATED" || code === "EDITION_SOLD_OUT")
+        void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
     },
     onSuccess: (order) => {
-      if (order.status !== "confirmed") {
-        setPurchaseError(() =>
-          order.status === "declined"
-            ? "Pagamento não aprovado. Tente novamente."
-            : "A transação ainda está aguardando confirmação.",
-        );
+      ambiguousAttempt.current = null;
+      if (order.status === "declined") {
+        orderAttempt.current = null;
+        setPurchaseError(() => declinedMessage);
         return;
       }
-      const walletLabels: Record<string, string> = {
-        walletconnect: "WalletConnect",
-        metamask: "MetaMask",
-        coinbase: "Coinbase Wallet",
-      };
+      if (order.status === "pending") {
+        trackPendingOrder(order, walletLabels[paymentMethod]);
+        return;
+      }
       setConfirmation(() => ({
         order,
         confirmedAt: new Date().toISOString(),
@@ -120,6 +171,23 @@ const CheckoutPage = () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
     },
   });
+
+  // A followed pending order is terminal once confirmed (show the receipt) or declined (allow a new attempt).
+  useEffect(() => {
+    if (!pendingOrder || pendingOrder.status === "pending") return;
+    clearPendingOrder();
+    orderAttempt.current = null;
+    if (pendingOrder.status === "confirmed") {
+      setConfirmation(() => ({
+        order: pendingOrder,
+        confirmedAt: new Date().toISOString(),
+        walletLabel: pendingWalletLabel,
+      }));
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
+    } else {
+      setPurchaseError(() => declinedMessage);
+    }
+  }, [clearPendingOrder, pendingOrder, pendingWalletLabel, queryClient]);
 
   // Quote once on entry, since the stored quote does not include its network.
   useEffect(() => {
@@ -149,21 +217,63 @@ const CheckoutPage = () => {
     orderMutation.error ??
     (couponError ? null : quoteMutation.error);
   const checkoutError =
+    (isTrackingPendingOrder ? pendingMessage : null) ??
     purchaseError ??
     (requestError
       ? `${orderMutation.error ? "Não foi possível confirmar a compra. " : quoteMutation.error ? "Não foi possível atualizar o total. " : ""}${getApiError(requestError).message}`
       : null);
   const handleConfirm = async () => {
-    if (isSubmitting.current) return;
+    // A pending payment must resolve first: a new confirmation would create a second purchase.
+    if (isSubmitting.current || isTrackingPendingOrder) return;
     isSubmitting.current = true;
     setPurchaseError(() => null);
     setIsConfirming(() => true);
     try {
+      if (ambiguousAttempt.current) {
+        await orderMutation.mutateAsync(ambiguousAttempt.current);
+        return;
+      }
       // Honor a click during recalculation, using its completed quote for the order.
-      if (quoteMutation.isError)
-        await requestQuote(currentQuote?.coupon ?? null, network);
-      else await pendingQuote.current;
-      await orderMutation.mutateAsync();
+      await pendingQuote.current?.catch(() => undefined);
+      // What the user reviewed on screen, before syncing with the server.
+      const reviewedCart = queryClient.getQueryData<Cart>(queryKeys.cart);
+      const reviewedTotal = reviewedCart?.quote?.totalEth ?? null;
+      // Confirm against the server's current cart (not a possibly stale cache entry, e.g. right after a 409).
+      const latestCart = await queryClient.fetchQuery({
+        queryKey: queryKeys.cart,
+        queryFn: getCart,
+        staleTime: 0,
+      });
+      // A sold-out edition cannot be bought: say so instead of asking for a new review.
+      if (latestCart.items.some((item) => item.nft.available === 0)) {
+        setPurchaseError(() => soldOutMessage);
+        return;
+      }
+      // Never order on a missing, failed, expired or outdated quote: recalculate first.
+      const latestQuote = latestCart.quote;
+      const isQuoteOutdated =
+        !latestQuote ||
+        quoteMutation.isError ||
+        latestQuote.cartVersion !== latestCart.version ||
+        new Date(latestQuote.expiresAt).getTime() <= Date.now();
+      const refreshedQuote = isQuoteOutdated
+        ? await requestQuote(latestQuote?.coupon ?? null, network)
+        : latestQuote;
+      // Changes the user has not seen yet (cart edited elsewhere, new prices or fees) require a new confirmation.
+      if (
+        latestCart.version !== reviewedCart?.version ||
+        refreshedQuote.totalEth !== reviewedTotal
+      ) {
+        setPurchaseError(
+          () =>
+            "Os valores do pedido mudaram. Revise o resumo e confirme novamente.",
+        );
+        return;
+      }
+      await orderMutation.mutateAsync({
+        orderNetwork: network,
+        cartVersion: latestCart.version,
+      });
     } catch {
       // The mutations already expose their errors beside the purchase button.
     } finally {
@@ -227,7 +337,7 @@ const CheckoutPage = () => {
       <main className="mx-auto w-full max-w-xl px-6 pb-6 pt-7">
         <MobileCheckout
           error={checkoutError}
-          isOrdering={isConfirming}
+          isOrdering={isConfirming || isTrackingPendingOrder}
           isQuoting={quoteMutation.isPending}
           onConfirm={() => void handleConfirm()}
           onNetworkChange={setNetwork}
@@ -269,7 +379,7 @@ const CheckoutPage = () => {
       </Breadcrumb>
       <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.54fr)] lg:gap-8">
         <CollectorForm
-          disabled={isConfirming}
+          disabled={isConfirming || isTrackingPendingOrder}
           isQuoting={quoteMutation.isPending}
           network={network}
           onConfirm={() => void handleConfirm()}
@@ -280,7 +390,7 @@ const CheckoutPage = () => {
         <CheckoutSummary
           couponError={couponError}
           error={checkoutError}
-          isOrdering={isConfirming}
+          isOrdering={isConfirming || isTrackingPendingOrder}
           isQuoting={quoteMutation.isPending}
           items={cart.items}
           onApplyCoupon={(coupon) => {

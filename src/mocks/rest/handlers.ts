@@ -34,6 +34,11 @@ import {
 } from "shared/contracts/marketplace";
 import { verifyFirebaseToken } from "mocks/auth/verify-firebase-token";
 import { MockPersistenceError } from "mocks/persistence";
+import {
+  getMockLatencyMs,
+  getMockScenario,
+  orderTimeoutDelayMs,
+} from "mocks/scenarios";
 
 const apiError = (
   code: string,
@@ -55,7 +60,8 @@ const withPersistenceErrors = (resolve: () => Response): Response => {
 const getSessionToken = (request: Request) =>
   request.headers.get("x-session-token");
 
-const waitForMockNetwork = async () => delay(220);
+// Latency follows the selected scenario (normal, slow or variable with a fixed seed).
+const waitForMockNetwork = async () => delay(getMockLatencyMs());
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -80,9 +86,30 @@ const passwordSchema = z.object({
   currentPassword: z.string().min(1),
   nextPassword: z.string().min(8),
 });
-const orderSchema = z.object({ network: networkSchema });
+const orderSchema = z.object({
+  network: networkSchema,
+  cartVersion: z.number().int().nonnegative(),
+});
 
 export const handlers = [
+  // Network scenarios first: offline or forced HTTP errors short-circuit every matching API request.
+  http.all("/api/*", async ({ request }) => {
+    const scenario = getMockScenario();
+    if (scenario.network === "offline") return HttpResponse.error();
+    if (
+      scenario.failurePath &&
+      new URL(request.url).pathname.startsWith(scenario.failurePath)
+    ) {
+      await waitForMockNetwork();
+      return apiError(
+        "SIMULATED_FAILURE",
+        "Serviço temporariamente indisponível. Tente novamente.",
+        scenario.failureStatus,
+      );
+    }
+    return undefined;
+  }),
+
   http.post("/api/auth/firebase", async ({ request }) => {
     const parsed = firebaseLoginSchema.safeParse(await request.json());
     if (!parsed.success)
@@ -225,6 +252,8 @@ export const handlers = [
     );
     if (cart === "not-found")
       return apiError("NOT_FOUND", "NFT não encontrado.", 404);
+    if (cart === "sold-out")
+      return apiError("EDITION_SOLD_OUT", "Esta edição esgotou.", 409);
     return HttpResponse.json(cart, { status: 201 });
   }),
 
@@ -266,6 +295,8 @@ export const handlers = [
     );
     if (quote === "invalid-coupon")
       return apiError("COUPON_INVALID", "Este cupom não é válido.", 422);
+    if (quote === "expired-coupon")
+      return apiError("COUPON_EXPIRED", "Este cupom expirou.", 422);
     return HttpResponse.json(quote);
   }),
 
@@ -300,25 +331,51 @@ export const handlers = [
         "Chave de idempotência ausente.",
         422,
       );
-    return withPersistenceErrors(() => {
-      const order = createOrder(
+    let isNewOrder = false;
+    const response = withPersistenceErrors(() => {
+      const result = createOrder(
         getSessionToken(request),
         parsed.data.network,
+        parsed.data.cartVersion,
         idempotencyKey,
       );
-      if (order === "unauthorized")
+      if (result === "unauthorized")
         return apiError("UNAUTHORIZED", "Entre para finalizar a compra.", 401);
-      if (order === "empty-cart")
+      if (result === "empty-cart")
         return apiError("CONFLICT", "Seu carrinho está vazio.", 409);
-      return HttpResponse.json(order, { status: 201 });
+      if (result === "idempotency-conflict")
+        return apiError(
+          "IDEMPOTENCY_CONFLICT",
+          "Esta tentativa de compra já foi usada para outro pedido. Revise o pedido e confirme novamente.",
+          409,
+        );
+      if (result === "sold-out")
+        return apiError(
+          "EDITION_SOLD_OUT",
+          "Uma edição do seu carrinho esgotou durante a compra. Revise o carrinho.",
+          409,
+        );
+      if (result === "stale-quote")
+        return apiError(
+          "QUOTE_OUTDATED",
+          "Os valores do pedido mudaram. Revise o resumo e confirme novamente.",
+          409,
+        );
+      isNewOrder = result.isNew;
+      return HttpResponse.json(result.order, { status: 201 });
     });
+    // Timeout scenario: the order exists, but the answer arrives after the client gave up. Retries with the same
+    // idempotency key are answered immediately with the same order.
+    if (isNewOrder && getMockScenario().orderTimeout)
+      await delay(orderTimeoutDelayMs);
+    return response;
   }),
 
   http.get("/api/orders/:orderId", async ({ params, request }) => {
     await waitForMockNetwork();
     if (!getSession(getSessionToken(request)))
       return apiError("UNAUTHORIZED", "Entre para consultar pedidos.", 401);
-    const order = getOrder(String(params.orderId));
+    const order = getOrder(getSessionToken(request), String(params.orderId));
     if (!order) return apiError("NOT_FOUND", "Pedido não encontrado.", 404);
     return HttpResponse.json(order);
   }),

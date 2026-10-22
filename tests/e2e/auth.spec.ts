@@ -5,6 +5,7 @@ import {
   expectLoggedIn,
   expectLoggedOut,
 } from "../helpers/auth";
+import { waitForMocks } from "../helpers/mocks";
 
 test("abre e fecha o modal em qualquer página sem trocar a rota", async ({
   page,
@@ -104,8 +105,14 @@ test("cadastra com confirmação de senha visível e leva ao início", async ({
   await modal
     .getByRole("button", { name: "Ocultar confirmação de senha", exact: true })
     .click();
-  await modal.getByLabel("Confirmar senha", { exact: true }).press("End");
-  await modal.getByLabel("Confirmar senha", { exact: true }).press("Backspace");
+  // Mobile emulation does not move the caret with "End" after toggling visibility: focus once, place the caret
+  // explicitly and type through page.keyboard (locator.press would refocus the field and reset the selection).
+  const confirmPassword = modal.getByLabel("Confirmar senha", { exact: true });
+  await confirmPassword.focus();
+  await confirmPassword.evaluate((input: HTMLInputElement) =>
+    input.setSelectionRange(input.value.length, input.value.length),
+  );
+  await page.keyboard.press("Backspace");
   await expect(modal.locator("[data-password-mask]")).toHaveText([
     "**********",
     "*********",
@@ -201,6 +208,7 @@ test("mostra erros de acesso sem fechar o modal ou simular login social", async 
 
 test("a ponte social rejeita um token não verificado", async ({ page }) => {
   await page.goto("/");
+  await waitForMocks(page);
   const status = await page.evaluate(async () => {
     const response = await fetch("/api/auth/firebase", {
       method: "POST",
@@ -211,4 +219,92 @@ test("a ponte social rejeita um token não verificado", async ({ page }) => {
   });
   expect(status).toBe(401);
   await expectLoggedOut(page);
+});
+
+test("cadastro com e-mail existente mostra conflito sem fechar o modal", async ({
+  page,
+}) => {
+  await page.goto("/nfts/emerald-ape-042");
+  await openLogin(page);
+  await page.getByRole("tab", { name: "Criar conta", exact: true }).click();
+  const modal = page.getByRole("dialog", { name: "Criar conta", exact: true });
+  await modal
+    .getByRole("textbox", { name: "Nome de usuário", exact: true })
+    .fill("Ana Duplicada");
+  await modal
+    .getByRole("textbox", { name: "E-mail", exact: true })
+    .fill("collector@kurio.test");
+  await modal.getByLabel("Senha", { exact: true }).fill("Kurio#2026");
+  await modal.getByLabel("Confirmar senha", { exact: true }).fill("Kurio#2026");
+  await modal.getByRole("button", { name: "Criar conta", exact: true }).click();
+  await expect(modal.getByRole("alert")).toHaveText(
+    "Este e-mail já possui uma conta.",
+  );
+  await expect(modal).toBeVisible();
+  await expect(page).toHaveURL("/nfts/emerald-ape-042");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expectLoggedOut(page);
+});
+
+test("troca de usuário não mistura carrinho nem favoritos", async ({
+  page,
+}) => {
+  const cartLink = (count: number) =>
+    page.getByRole("link", {
+      name: `Carrinho com ${count} itens`,
+      includeHidden: true,
+    });
+  const favoriteButton = () =>
+    page
+      .getByRole("button", {
+        name: /^(Favoritar|Favoritado|Favoritar NFT|Remover dos favoritos)$/,
+      })
+      .filter({ visible: true });
+  const signOut = async () => {
+    await page.goto("/account/profile");
+    await page
+      .getByRole("navigation", { name: "Configurações da conta" })
+      .getByRole("button", { name: "Sair", exact: true })
+      .click();
+    await expect(page).toHaveURL("/");
+    await expectLoggedOut(page);
+  };
+
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await openLogin(page);
+  await completeCollectorLogin(page);
+  await page.goto("/nfts/sage-nomad-009");
+  await page.getByRole("button", { name: /^(Comprar|Comprar NFT)$/ }).click();
+  await expect(cartLink(1)).toHaveCount(1);
+  await favoriteButton().click();
+  await expect(favoriteButton()).toHaveAttribute("aria-pressed", "true");
+
+  await signOut();
+  await expect(cartLink(0)).toHaveCount(1);
+
+  await page.goto("/nfts/sage-nomad-009");
+  await openLogin(page);
+  await page.getByRole("tab", { name: "Criar conta", exact: true }).click();
+  const modal = page.getByRole("dialog", { name: "Criar conta", exact: true });
+  await modal
+    .getByRole("textbox", { name: "Nome de usuário", exact: true })
+    .fill("Lia Troca");
+  await modal
+    .getByRole("textbox", { name: "E-mail", exact: true })
+    .fill(`lia-${crypto.randomUUID()}@kurio.test`);
+  await modal.getByLabel("Senha", { exact: true }).fill("Kurio#2026");
+  await modal.getByLabel("Confirmar senha", { exact: true }).fill("Kurio#2026");
+  await modal.getByRole("button", { name: "Criar conta", exact: true }).click();
+  await expect(page).toHaveURL("/");
+  await expect(cartLink(0)).toHaveCount(1);
+  await page.goto("/nfts/sage-nomad-009");
+  await expect(favoriteButton()).toHaveAttribute("aria-pressed", "false");
+
+  await signOut();
+  await openLogin(page);
+  await completeCollectorLogin(page);
+  await expect(cartLink(1)).toHaveCount(1);
+  await page.goto("/nfts/sage-nomad-009");
+  await expect(favoriteButton()).toHaveAttribute("aria-pressed", "true");
 });

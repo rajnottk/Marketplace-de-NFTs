@@ -15,9 +15,7 @@ import {
   Profile,
   ShoppingCart,
 } from "iconsax-react";
-import { useState } from "react";
 import { useAuthModal } from "modules/auth/hooks/use-auth-modal";
-import { getApiError } from "shared/api/api-error";
 import { logout, queryKeys } from "shared/api/marketplace.api";
 import { useSession } from "shared/hooks/use-session";
 import { clearSessionToken } from "shared/lib/session";
@@ -45,19 +43,23 @@ const AccountLayout = () => {
   const activeIndex = accountNavigation.findIndex(
     (item) => item.to === currentPath,
   );
-  const [logoutError, setLogoutError] = useState("");
   const logoutMutation = useMutation({
     mutationFn: logout,
-    onSuccess: () => {
+    // Always sign out locally, even if the API call fails (offline, 5xx, expired token): never leave a shared device logged in.
+    onSettled: () => {
       clearSessionToken();
       queryClient.setQueryData(queryKeys.session, null);
-      [queryKeys.favorites, queryKeys.wallets, queryKeys.profile].forEach(
-        (queryKey) => queryClient.removeQueries({ queryKey }),
-      );
+      // Private data of the previous user must not stay visible until a refetch: remove it, then load the guest cart.
+      [
+        queryKeys.favorites,
+        queryKeys.wallets,
+        queryKeys.profile,
+        queryKeys.cart,
+        ["order"],
+      ].forEach((queryKey) => queryClient.removeQueries({ queryKey }));
       void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
       void navigate({ to: "/" });
     },
-    onError: (error) => setLogoutError(() => getApiError(error).message),
   });
   if (isLoading)
     return (
@@ -126,11 +128,6 @@ const AccountLayout = () => {
           />
           {logoutMutation.isPending ? "Saindo…" : "Sair"}
         </button>
-        {logoutError && (
-          <p className="px-3 pb-3 text-xs text-danger" role="alert">
-            {logoutError}
-          </p>
-        )}
       </nav>
       <section className="min-w-0">
         <Outlet />

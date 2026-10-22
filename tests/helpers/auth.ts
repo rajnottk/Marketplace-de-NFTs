@@ -38,11 +38,12 @@ export const expectLoggedIn = async (
     ).toHaveAttribute("aria-label", `Perfil de ${displayName}`);
     return;
   }
+  // Guests also see a "Perfil" link (pointing to /login): wait until it targets the authenticated profile.
   await expect(
     page
       .getByRole("navigation", { name: "Navegação mobile" })
       .getByRole("link", { name: "Perfil", exact: true }),
-  ).toBeVisible();
+  ).toHaveAttribute("href", "/account/profile");
 };
 
 export const expectLoggedOut = async (page: Page) => {

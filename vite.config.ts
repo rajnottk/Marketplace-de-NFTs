@@ -1,28 +1,9 @@
 import { fileURLToPath, URL } from "node:url";
 import react from "@vitejs/plugin-react";
-import { Server } from "socket.io";
-import { defineConfig, type Plugin } from "vite";
-
-const socketMockPlugin = (): Plugin => ({
-  name: "kurio-socket-mock",
-  configureServer: (server) => {
-    if (!server.httpServer) return;
-    const socketServer = new Server(server.httpServer, {
-      cors: { origin: true },
-    });
-    socketServer.on("connection", (socket) => {
-      socket.on("demo:nft-update", (event) =>
-        socketServer.emit("nft.updated", event),
-      );
-      socket.on("demo:order-update", (event) =>
-        socketServer.emit("order.updated", event),
-      );
-    });
-  },
-});
+import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [react(), socketMockPlugin()],
+  plugins: [react()],
   resolve: {
     alias: {
       assets: fileURLToPath(new URL("./src/assets", import.meta.url)),

@@ -279,15 +279,27 @@ npm install
 npm run dev
 ```
 
-Abra `http://localhost:5173`. Os mocks são ativados por padrão; defina `VITE_ENABLE_MOCKS=false` apenas quando houver uma API compatível disponível.
+Abra `http://localhost:5173`.
+
+Os mocks (MSW) só sobem com `VITE_ENABLE_MOCKS=true`, de forma explícita:
+
+| Comando              | Mocks                                  | Origem da flag                                            |
+| -------------------- | -------------------------------------- | --------------------------------------------------------- |
+| `npm run dev`        | Ligados                                | `.env.development`                                        |
+| `npm run build:demo` | Ligados (build de demonstração/deploy) | `.env.demo` (`vite --mode demo`)                          |
+| `npm run build`      | **Desligados**                         | Sem a flag, o MSW nem entra no bundle                     |
+| `npm run test:e2e`   | Ligados                                | `playwright.config.ts` (servidor próprio na porta `5180`) |
+
+Um `.env.local` tem prioridade sobre esses arquivos. Para usar uma API real, defina `VITE_ENABLE_MOCKS=false` e `VITE_API_URL`.
 
 ### Credenciais de demonstração
 
-| Campo        | Valor                  |
-| ------------ | ---------------------- |
-| E-mail       | `collector@kurio.test` |
-| Senha        | `Kurio#2026`           |
-| Cupom válido | `KURIO10`              |
+| Item           | Valor                                                 |
+| -------------- | ----------------------------------------------------- |
+| Usuária 1      | `collector@kurio.test` / `Kurio#2026` (Ana Coleciona) |
+| Usuária 2      | `lia@kurio.test` / `Kurio#2026` (Lia Coleciona)       |
+| Cupom válido   | `KURIO10` (10% de desconto)                           |
+| Cupom expirado | `KURIO-EXPIRADO`                                      |
 
 ### Comandos
 
@@ -295,17 +307,64 @@ Abra `http://localhost:5173`. Os mocks são ativados por padrão; defina `VITE_E
 npm run typecheck
 npm run lint
 npm run build
+npm run build:demo
+npx playwright install chromium   # uma vez por máquina
 npm run test:e2e
 npm run test:visual:update
 npm run preview
 npm run audit:lighthouse
 ```
 
-`audit:lighthouse` espera uma aplicação em preview na porta `4173`; execute `npm run preview` em outro terminal antes da auditoria. Os relatórios são gravados em `lighthouse-reports/`.
+### Testes E2E e regressão visual
+
+- `npm run test:e2e` sobe um servidor próprio na porta `5180` (`VITE_ENABLE_MOCKS=true`, Firebase desligado), independente do `.env.local` e de um `npm run dev` aberto.
+- As baselines visuais (início, detalhe, carrinho e pagamento, em desktop e mobile) ficam em `tests/visual/__screenshots__/`, sem sufixo de sistema operacional. Os testes visuais fixam a data da página, o fuso (`America/Sao_Paulo`), o locale (`pt-BR`) e `reducedMotion`, esperam fontes e imagens e mascaram os carrosséis com autoplay.
+- A renderização de fontes varia entre sistemas: as baselines atuais foram geradas no macOS. Para rodar em Linux/CI, regenere com `npm run test:visual:update` no mesmo ambiente do CI (por exemplo, a imagem `mcr.microsoft.com/playwright`) e versione o resultado.
+- Relatório HTML em `playwright-report/` e traces das falhas em `test-results/`.
+
+`audit:lighthouse` espera uma aplicação em preview na porta `4173`; execute `npm run build:demo && npm run preview` em outro terminal antes da auditoria. Os relatórios são gravados em `lighthouse-reports/`.
 
 ### Cenários e reset
 
-O estado de demonstração é compartilhado entre os handlers REST e persistido localmente para sustentar refresh. Para voltar ao cenário conhecido, limpe o armazenamento do navegador para o host local e recarregue a página. Os handlers cobrem credenciais inválidas, conflito de cadastro, cupom inválido, estoque insuficiente, rota de NFT inexistente, sessão ausente e pedido vazio.
+O estado de demonstração é compartilhado entre os handlers REST e o Socket.IO simulado, e é persistido localmente para sustentar refresh. Com os mocks ligados, há duas formas equivalentes de controlar os cenários:
+
+- **Console:** `window.kurioMocks` (por exemplo, `kurioMocks.setScenario({ payment: "declined" })`).
+- **URL:** `?mock-scenario=chave:valor,chave:valor` aplica um cenário ao carregar; `?mock-reset=1` restaura os dados e o cenário padrão.
+
+| Cenário                         | Valores                                                                    | Efeito                                                                                                                              |
+| ------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `latency`                       | `normal` (220 ms), `slow` (2 s), `variable` (100 ms a 1,5 s, semente fixa) | Latência das respostas; `variable` gera respostas fora de ordem de forma reproduzível                                               |
+| `network`                       | `online`, `offline`                                                        | `offline` faz toda chamada à API falhar por conexão                                                                                 |
+| `failurePath` + `failureStatus` | prefixo de rota (ex.: `/api/nfts`) + status (500, 503, 404, 429)           | Força o erro HTTP nas rotas com esse prefixo                                                                                        |
+| `payment`                       | `confirmed`, `declined`, `pending`                                         | Resultado do pagamento; `pending` é confirmado em 4 s via `order.updated` (ou com `confirmPendingOrders()`)                         |
+| `orderTimeout`                  | `true`, `false`                                                            | Cria o pedido, mas responde depois do timeout do cliente (8 s); a nova tentativa recupera o mesmo pedido pela chave de idempotência |
+
+Ações disponíveis em `window.kurioMocks`:
+
+| Ação                                               | Uso                                                                                         |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `changeNftPrice(nftId, priceEth)`                  | Muda o preço, atualiza os carrinhos que têm o NFT e emite `nft.updated`                     |
+| `markNftSoldOut(nftId)`                            | Esgota a edição: o carrinho avisa e o pedido é recusado com 409                             |
+| `redeliverNftEvent(nftId, "latest" \| "previous")` | Reenvia um evento duplicado ou antigo, que o cliente deve ignorar                           |
+| `dropRealtime()` / `restoreRealtime()`             | Derruba e restaura o Socket.IO; ao reconectar, o cliente reconcilia via REST                |
+| `expireSessions()`                                 | Expira as sessões: a próxima requisição autenticada responde 401 e o login é pedido de novo |
+| `confirmPendingOrders()`                           | Confirma os pedidos pendentes                                                               |
+| `reset()`                                          | Restaura os dados e o cenário padrão e recarrega a página                                   |
+
+#### Reproduzir os fluxos de falha
+
+| Fluxo                      | Como reproduzir                                                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Pagamento recusado         | Cenário `payment: declined` → confirmar a compra → mensagem de recusa; trocar para `confirmed` e confirmar de novo              |
+| Timeout com recuperação    | Ativar `orderTimeout` → confirmar → mensagem de demora (8 s) → desativar e confirmar de novo: o mesmo pedido é recuperado       |
+| Pedido pendente            | Cenário `payment: pending` → confirmar → recarregar a página → `kurioMocks.confirmPendingOrders()` mostra o recibo              |
+| Preço alterado no checkout | No checkout, `kurioMocks.changeNftPrice("emerald-ape-042", "2.50")` com o NFT no carrinho → aviso e resumo atualizados          |
+| Edição esgotada            | No checkout, `kurioMocks.markNftSoldOut(<id>)` → aviso → a confirmação é bloqueada                                              |
+| Falha 5xx e nova tentativa | `failurePath: /api/nfts`, `failureStatus: 503` → recarregar → "Tentar novamente" depois de remover a falha                      |
+| Sem conexão                | `network: offline` → recarregar → mensagem de conexão → voltar para `online` e tentar de novo                                   |
+| Sessão expirada            | Logada, `kurioMocks.expireSessions()` → navegar para outra página da conta → aviso e modal de login                             |
+| Socket caído               | `kurioMocks.dropRealtime()` → alterar um preço (o evento se perde) → `kurioMocks.restoreRealtime()` → a tela reconcilia o preço |
+| Cupom inválido / expirado  | No carrinho, `CUPOM-ERRADO` ou `KURIO-EXPIRADO`                                                                                 |
 
 As decisões de sessão, cache, contratos, eventos e desvios provisórios do Figma estão em [ARCHITECTURE.md](ARCHITECTURE.md).
 
