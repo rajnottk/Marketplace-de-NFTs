@@ -75,7 +75,7 @@ test("salva os dados preenchidos e sincroniza o avatar com o header", async ({
     .getByAltText("Avatar do perfil")
     .getAttribute("src");
   await expect(
-    page.getByRole("banner").getByAltText("Avatar de Ana Atualizada"),
+    page.locator("header").getByAltText("Avatar de Ana Atualizada"),
   ).toHaveAttribute("src", avatarSource!);
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(
@@ -94,7 +94,7 @@ test("salva os dados preenchidos e sincroniza o avatar com o header", async ({
     page.getByLabel("Apelido da carteira", { exact: true }),
   ).toHaveValue("Minha Ledger");
   await expect(
-    page.getByRole("banner").getByAltText("Avatar de Ana Atualizada"),
+    page.locator("header").getByAltText("Avatar de Ana Atualizada"),
   ).toHaveAttribute("src", avatarSource!);
   await page.getByRole("button", { name: "Remover", exact: true }).click();
   await page.getByRole("button", { name: "Salvar", exact: true }).click();
@@ -104,9 +104,7 @@ test("salva os dados preenchidos e sincroniza o avatar com o header", async ({
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.getByLabel("Sem avatar", { exact: true })).toBeVisible();
   await expect(page.getByRole("banner").getByRole("img")).toHaveCount(0);
-  await expect(
-    page.getByRole("link", { name: "Perfil de Ana Atualizada" }),
-  ).toBeVisible();
+  await expectLoggedIn(page, "Ana Atualizada");
 });
 
 test("valida a troca de senha e evita salvar o perfil com senha atual incorreta", async ({

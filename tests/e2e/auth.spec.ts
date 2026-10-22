@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   completeCollectorLogin,
   openLogin,
+  expectLoggedIn,
   expectLoggedOut,
 } from "../helpers/auth";
 
@@ -31,21 +32,28 @@ test("entra, preserva a página e mantém o usuário após recarregar", async ({
   page,
 }) => {
   await page.goto("/nfts/emerald-ape-042");
-  await page.getByRole("button", { name: "Favoritar", exact: true }).click();
+  await page
+    .getByRole("button", { name: /^Favoritar( NFT)?$/, exact: true })
+    .click();
   await completeCollectorLogin(page);
   await expect(page).toHaveURL("/nfts/emerald-ape-042");
   await page.reload();
-  await expect(page.getByLabel("Perfil de Ana Coleciona")).toBeVisible();
+  await expectLoggedIn(page);
 });
 
 test("cadastra com confirmação de senha visível e leva ao perfil", async ({
   page,
 }, testInfo) => {
   await page.goto("/nfts/emerald-ape-042");
-  await page.getByRole("button", { name: "Comprar", exact: true }).click();
+  await page
+    .getByRole("button", { name: /^(Comprar|Comprar NFT)$/, exact: true })
+    .click();
   await expect(
-    page.getByRole("link", { name: "Carrinho com 1 itens" }),
-  ).toBeVisible();
+    page.getByRole("link", {
+      name: "Carrinho com 1 itens",
+      includeHidden: true,
+    }),
+  ).toHaveCount(1);
   await openLogin(page);
   await page.getByRole("tab", { name: "Criar conta", exact: true }).click();
   const modal = page.getByRole("dialog", { name: "Criar conta", exact: true });
@@ -110,10 +118,13 @@ test("cadastra com confirmação de senha visível e leva ao perfil", async ({
   await expect(
     page.getByRole("heading", { name: /perfil do colecionador/i }),
   ).toBeVisible();
-  await expect(page.getByLabel("Perfil de Lia Coleciona")).toBeVisible();
+  await expectLoggedIn(page, "Lia Coleciona");
   await expect(
-    page.getByRole("link", { name: "Carrinho com 1 itens" }),
-  ).toBeVisible();
+    page.getByRole("link", {
+      name: "Carrinho com 1 itens",
+      includeHidden: true,
+    }),
+  ).toHaveCount(1);
 });
 
 test("recupera senha apenas visualmente e permite voltar pela aba Entrar", async ({

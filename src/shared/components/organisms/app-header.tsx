@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { LogIn, Menu, Search, ShoppingCart, UserRound } from "lucide-react";
+import { LogIn, Search, ShoppingCart, UserRound } from "lucide-react";
 import { CatalogSearchInput } from "modules/catalog/components/catalog-search";
 import { CatalogFilterTrigger } from "modules/catalog/components/catalog-filter-trigger";
 import { Link, useRouterState } from "@tanstack/react-router";
@@ -67,130 +67,123 @@ const AppHeader = () => {
   }, [marketCatalog, currentPath]);
 
   return (
-    <header className="sticky top-0 z-30 bg-[#140D0A] font-mono">
+    <>
       {isHome && (
         <div className="flex items-center gap-2 px-4 py-4 md:hidden">
           <CatalogSearchInput />
           <CatalogFilterTrigger />
         </div>
       )}
-      <div
-        className={`mx-auto h-[68px] w-full max-w-[1200px] items-center justify-between gap-4 border-b-[0.3px] border-primary px-4 xl:px-0 ${isHome ? "hidden md:flex" : "flex"}`}
-      >
-        <Link
-          aria-label="Kurio: página inicial"
-          className="text-sm font-bold tracking-[0.2em] text-ink"
-          to="/"
-        >
-          KURIO
-        </Link>
-        <Tabs
-          className={`hidden h-full ${isSearchOpen ? "lg:flex" : "md:flex"}`}
-          value={activeTab}
-        >
-          <nav aria-label="Navegação principal" className="h-full">
-            <TabsList className="h-full gap-4 xl:gap-10" variant="line">
-              <TabsTrigger
-                className={navigationTabClassName}
-                nativeButton={false}
-                render={<Link to="/" />}
-                value="home"
-              >
-                Início
-              </TabsTrigger>
-              <TabsTrigger
-                className={navigationTabClassName}
-                nativeButton={false}
-                render={
-                  randomNftId ? (
-                    <Link params={{ nftId: randomNftId }} to="/nfts/$nftId" />
-                  ) : (
-                    <Link to="/" />
-                  )
-                }
-                value="market"
-              >
-                Mercado
-              </TabsTrigger>
-              {underConstructionNavigationItems.map((item) => (
+      <header className="sticky top-0 z-30 hidden bg-[#140D0A] font-mono md:block">
+        <div className="mx-auto flex h-[68px] w-full max-w-[1200px] items-center justify-between gap-4 border-b-[0.3px] border-primary px-4 xl:px-0">
+          <Link
+            aria-label="Kurio: página inicial"
+            className="text-sm font-bold tracking-[0.2em] text-ink"
+            to="/"
+          >
+            KURIO
+          </Link>
+          <Tabs
+            className={`hidden h-full ${isSearchOpen ? "lg:flex" : "md:flex"}`}
+            value={activeTab}
+          >
+            <nav aria-label="Navegação principal" className="h-full">
+              <TabsList className="h-full gap-4 xl:gap-10" variant="line">
                 <TabsTrigger
                   className={navigationTabClassName}
-                  key={item.value}
                   nativeButton={false}
-                  render={<Link to={item.to} />}
-                  value={item.value}
+                  render={<Link to="/" />}
+                  value="home"
                 >
-                  {item.label}
+                  Início
                 </TabsTrigger>
-              ))}
-            </TabsList>
-          </nav>
-        </Tabs>
-        <div className="flex min-w-0 items-center gap-2 lg:gap-4">
-          {isSearchOpen && (
-            <div className="w-28 shrink xl:w-48 lg:w-40">
-              <CatalogSearchInput autoFocus compact />
+                <TabsTrigger
+                  className={navigationTabClassName}
+                  nativeButton={false}
+                  render={
+                    randomNftId ? (
+                      <Link params={{ nftId: randomNftId }} to="/nfts/$nftId" />
+                    ) : (
+                      <Link to="/" />
+                    )
+                  }
+                  value="market"
+                >
+                  Mercado
+                </TabsTrigger>
+                {underConstructionNavigationItems.map((item) => (
+                  <TabsTrigger
+                    className={navigationTabClassName}
+                    key={item.value}
+                    nativeButton={false}
+                    render={<Link to={item.to} />}
+                    value={item.value}
+                  >
+                    {item.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </nav>
+          </Tabs>
+          <div className="flex min-w-0 items-center gap-2 lg:gap-4">
+            {isSearchOpen && (
+              <div className="w-28 shrink xl:w-48 lg:w-40">
+                <CatalogSearchInput autoFocus compact />
+              </div>
+            )}
+            <button
+              aria-expanded={isSearchOpen}
+              aria-label="Abrir pesquisa de NFTs"
+              className="grid h-10 w-10 place-items-center text-ink hover:text-accent"
+              onClick={() => setIsSearchOpen((previous) => !previous)}
+              type="button"
+            >
+              <Search size={24} />
+            </button>
+            <div className="hidden md:block lg:hidden">
+              <CatalogFilterTrigger />
             </div>
-          )}
-          <button
-            aria-expanded={isSearchOpen}
-            aria-label="Abrir pesquisa de NFTs"
-            className="grid h-10 w-10 place-items-center text-ink hover:text-accent"
-            onClick={() => setIsSearchOpen((previous) => !previous)}
-            type="button"
-          >
-            <Search size={24} />
-          </button>
-          <div className="hidden md:block lg:hidden">
-            <CatalogFilterTrigger />
-          </div>
-          <Link
-            aria-label={`Carrinho com ${cartItemCount} itens`}
-            className="relative grid h-10 w-10 place-items-center text-ink hover:text-accent"
-            to="/cart"
-          >
-            <ShoppingCart size={24} />
-            {cartItemCount ? (
-              <span className="absolute right-0 top-0 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-bold text-[#140D0A]">
-                {cartItemCount}
-              </span>
-            ) : null}
-          </Link>
-          {session ? (
             <Link
-              aria-label={`Perfil de ${session.user.displayName}`}
-              className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border border-line text-accent hover:border-primary"
-              to="/account/profile"
+              aria-label={`Carrinho com ${cartItemCount} itens`}
+              className="relative grid h-10 w-10 place-items-center text-ink hover:text-accent"
+              to="/cart"
             >
-              {session.user.avatarUrl ? (
-                <img
-                  alt={`Avatar de ${session.user.displayName}`}
-                  className="size-full object-cover"
-                  src={session.user.avatarUrl}
-                />
-              ) : (
-                <UserRound aria-hidden="true" size={22} strokeWidth={1.5} />
-              )}
+              <ShoppingCart size={24} />
+              {cartItemCount ? (
+                <span className="absolute right-0 top-0 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-bold text-[#140D0A]">
+                  {cartItemCount}
+                </span>
+              ) : null}
             </Link>
-          ) : (
-            <Button
-              className="h-9 bg-[#D28A4C] px-4 text-base font-medium text-[#140D0A] shadow-none hover:bg-[#D28A4C]/90 [&_svg]:size-5"
-              onClick={() => openAuth()}
-            >
-              <LogIn />
-              Entrar
-            </Button>
-          )}
-          <button
-            aria-label="Abrir menu"
-            className="grid h-10 w-10 place-items-center text-ink md:hidden"
-            type="button"
-          >
-            <Menu size={19} />
-          </button>
+            {session ? (
+              <Link
+                aria-label={`Perfil de ${session.user.displayName}`}
+                className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-full border border-line text-accent hover:border-primary"
+                to="/account/profile"
+              >
+                {session.user.avatarUrl ? (
+                  <img
+                    alt={`Avatar de ${session.user.displayName}`}
+                    className="size-full object-cover"
+                    src={session.user.avatarUrl}
+                  />
+                ) : (
+                  <UserRound aria-hidden="true" size={22} strokeWidth={1.5} />
+                )}
+              </Link>
+            ) : (
+              <Button
+                className="h-9 bg-[#D28A4C] px-4 text-base font-medium text-[#140D0A] shadow-none hover:bg-[#D28A4C]/90 [&_svg]:size-5"
+                onClick={() => openAuth()}
+              >
+                <LogIn />
+                Entrar
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+    </>
   );
 };
 

@@ -9,14 +9,17 @@ const fillRequiredFields = async (page: Page) => {
 };
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/", { waitUntil: "domcontentloaded" });
   await openLogin(page);
   await completeCollectorLogin(page);
   await page.goto("/nfts/emerald-ape-042");
-  await page.getByRole("button", { name: "Comprar" }).click();
+  await page.getByRole("button", { name: /^(Comprar|Comprar NFT)$/ }).click();
   await expect(
-    page.getByRole("link", { name: "Carrinho com 1 itens" }),
-  ).toBeVisible();
+    page.getByRole("link", {
+      name: "Carrinho com 1 itens",
+      includeHidden: true,
+    }),
+  ).toHaveCount(1);
   await page.goto("/checkout");
   await expect(
     page.getByRole("combobox", { name: "Rede", exact: true }),
@@ -287,10 +290,13 @@ test("preserva os NFTs e valores no modal depois de esvaziar o carrinho", async 
     "neon-vessel-552",
   ].entries()) {
     await page.goto(`/nfts/${nftId}`);
-    await page.getByRole("button", { name: "Comprar" }).click();
+    await page.getByRole("button", { name: /^(Comprar|Comprar NFT)$/ }).click();
     await expect(
-      page.getByRole("link", { name: `Carrinho com ${index + 2} itens` }),
-    ).toBeVisible();
+      page.getByRole("link", {
+        name: `Carrinho com ${index + 2} itens`,
+        includeHidden: true,
+      }),
+    ).toHaveCount(1);
   }
   await page.goto("/checkout");
   await expect(

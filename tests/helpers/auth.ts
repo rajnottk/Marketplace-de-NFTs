@@ -4,11 +4,14 @@ export const openLogin = async (page: Page) => {
   const headerLogin = page
     .getByRole("banner")
     .getByRole("button", { name: "Entrar", exact: true });
-  if (
-    (page.viewportSize()?.width ?? 0) >= 768 ||
-    new URL(page.url()).pathname !== "/"
-  ) {
+  if ((page.viewportSize()?.width ?? 0) >= 768) {
     await headerLogin.click();
+    return;
+  }
+  if (new URL(page.url()).pathname.startsWith("/nfts/")) {
+    await page
+      .getByRole("button", { name: "Favoritar NFT", exact: true })
+      .click();
     return;
   }
   await page
@@ -24,11 +27,14 @@ export const expectLoggedIn = async (
   const headerProfile = page
     .getByRole("banner")
     .getByRole("link", { name: `Perfil de ${displayName}`, exact: true });
-  if (
-    (page.viewportSize()?.width ?? 0) >= 768 ||
-    new URL(page.url()).pathname !== "/"
-  ) {
+  if ((page.viewportSize()?.width ?? 0) >= 768) {
     await expect(headerProfile).toBeVisible();
+    return;
+  }
+  if (new URL(page.url()).pathname.startsWith("/nfts/")) {
+    await expect(
+      page.locator('header a[href="/account/profile"]'),
+    ).toHaveAttribute("aria-label", `Perfil de ${displayName}`);
     return;
   }
   await expect(
@@ -42,10 +48,7 @@ export const expectLoggedOut = async (page: Page) => {
   const headerLogin = page
     .getByRole("banner")
     .getByRole("button", { name: "Entrar", exact: true });
-  if (
-    (page.viewportSize()?.width ?? 0) >= 768 ||
-    new URL(page.url()).pathname !== "/"
-  ) {
+  if ((page.viewportSize()?.width ?? 0) >= 768) {
     await expect(headerLogin).toBeVisible();
     return;
   }

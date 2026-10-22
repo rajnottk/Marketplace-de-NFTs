@@ -219,6 +219,11 @@ test("mobile abre os filtros em modal e navega pela barra inferior", async ({
   await randomButton.click();
   await expect(page).toHaveURL(/\/nfts\/[^/]+$/);
   const firstNftUrl = page.url();
+  await expect(
+    page.getByRole("navigation", { name: "Navegação mobile", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Voltar", exact: true }).click();
+  await expect(page).toHaveURL("/account/profile");
   await randomButton.click();
   await expect.poll(() => page.url()).not.toBe(firstNftUrl);
   await expect(page).toHaveURL(/\/nfts\/[^/]+$/);

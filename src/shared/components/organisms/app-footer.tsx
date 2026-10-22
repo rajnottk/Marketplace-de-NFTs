@@ -117,7 +117,7 @@ const AppFooter = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="px-4 pb-6 pt-16 xl:px-0">
+    <footer className="hidden px-4 pb-6 pt-16 md:block xl:px-0">
       <div className="mx-auto max-w-[1200px] overflow-hidden bg-[#241612]">
         <div className="grid gap-8 px-8 py-8 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1.3fr] lg:gap-0 lg:pl-12 lg:pr-8">
           {highlights.map((highlight, index) => (

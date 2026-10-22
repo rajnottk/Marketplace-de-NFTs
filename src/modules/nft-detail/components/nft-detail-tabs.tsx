@@ -8,7 +8,7 @@ import {
 import type { Nft } from "shared/contracts/marketplace";
 
 const tabTriggerClassName =
-  "h-full flex-none px-0 pb-2 text-lg font-normal text-ink hover:text-accent data-[active]:font-bold data-[active]:text-accent after:!bottom-0 after:!h-[3px] after:rounded-t-sm after:bg-accent";
+  "h-full flex-none px-0 pb-2 text-sm font-normal text-ink hover:text-accent data-[active]:font-bold data-[active]:text-accent md:text-lg after:!bottom-0 after:!h-[3px] after:rounded-t-sm after:bg-accent";
 const sectionTitleClassName = "text-base font-bold text-ink";
 const sectionTextClassName = "mt-1 text-sm leading-7 text-[#CFB28C]";
 
@@ -17,10 +17,14 @@ interface NftDetailTabsProps {
 }
 
 const NftDetailTabs = ({ nft }: NftDetailTabsProps) => (
-  <Tabs className="mt-16" defaultValue="details">
+  <Tabs
+    className="mx-3 mt-16 scroll-mt-6 md:mx-0"
+    defaultValue="details"
+    id="nft-information"
+  >
     <TabsList
       aria-label="Informações do NFT"
-      className="h-11 w-full justify-start gap-10 border-b border-[#D28A4C]/60"
+      className="h-auto min-h-11 w-full flex-wrap justify-start gap-x-5 gap-y-2 border-b border-[#D28A4C]/60 md:h-11 md:flex-nowrap md:gap-10"
       variant="line"
     >
       <TabsTrigger className={tabTriggerClassName} value="details">

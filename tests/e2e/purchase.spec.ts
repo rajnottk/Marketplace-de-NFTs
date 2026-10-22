@@ -5,17 +5,20 @@ test("preserva o carrinho do visitante ao autenticar e conclui uma compra", asyn
   page,
 }) => {
   await page.goto("/nfts/emerald-ape-042");
-  await page.getByRole("button", { name: "Comprar" }).click();
+  await page.getByRole("button", { name: /^(Comprar|Comprar NFT)$/ }).click();
   await expect(
-    page.getByRole("link", { name: "Carrinho com 1 itens" }),
-  ).toBeVisible();
+    page.getByRole("link", {
+      name: "Carrinho com 1 itens",
+      includeHidden: true,
+    }),
+  ).toHaveCount(1);
 
-  await page.getByRole("link", { name: "Carrinho com 1 itens" }).click();
+  await page.locator('a[href="/cart"]:visible').first().click();
   await page.getByRole("button", { name: "Conectar e finalizar" }).click();
   await expect(page).toHaveURL(/\/cart$/);
   await completeCollectorLogin(page);
 
-  await page.getByRole("link", { name: /Carrinho com 1 itens/ }).click();
+  await page.locator('a[href="/cart"]:visible').first().click();
   await page.getByPlaceholder("Digite o código promocional...").fill("KURIO10");
   await page.getByRole("button", { name: "Aplicar" }).click();
   await page.getByRole("button", { name: "Conectar e finalizar" }).click();

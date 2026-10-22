@@ -17,9 +17,10 @@ import { NftDetailTabs } from "modules/nft-detail/components/nft-detail-tabs";
 import { NftGallery } from "modules/nft-detail/components/nft-gallery";
 import { NftPurchasePanel } from "modules/nft-detail/components/nft-purchase-panel";
 
-const pageClassName = "mx-auto w-full max-w-[1200px] px-4 pb-16 pt-8 xl:px-0";
+const pageClassName =
+  "mx-auto w-full max-w-[1200px] px-2 pb-12 pt-1 md:px-4 md:pb-16 md:pt-8 xl:px-0";
 const contentGridClassName =
-  "mt-4 grid gap-10 lg:grid-cols-[minmax(0,1.02fr)_minmax(0,1fr)] lg:gap-11";
+  "grid gap-0 md:mt-4 md:gap-10 lg:grid-cols-[minmax(0,1.02fr)_minmax(0,1fr)] lg:gap-11";
 
 const NftDetailBreadcrumb = () => (
   <Breadcrumb>
@@ -39,10 +40,10 @@ const NftDetailBreadcrumb = () => (
 
 const NftDetailSkeleton = () => (
   <main aria-busy="true" aria-label="Carregando NFT" className={pageClassName}>
-    <Skeleton className="h-6 w-40" />
+    <Skeleton className="hidden h-6 w-40 md:block" />
     <div className={contentGridClassName}>
-      <div className="grid grid-cols-[80px_minmax(0,1fr)] gap-4 sm:grid-cols-[101px_minmax(0,1fr)] sm:gap-7">
-        <div className="flex flex-col gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 gap-4 rounded-t-[40px] bg-[#2F1D15] p-6 md:grid-cols-[101px_minmax(0,1fr)] md:gap-7 md:rounded-none md:bg-transparent md:p-0">
+        <div className="hidden flex-col gap-4 md:flex">
           {Array.from({ length: 4 }, (_, index) => (
             <Skeleton className="aspect-square w-full" key={index} />
           ))}
@@ -89,13 +90,16 @@ const NftDetailPage = () => {
 
   return (
     <main className={pageClassName}>
-      <NftDetailBreadcrumb />
+      <div className="hidden md:block">
+        <NftDetailBreadcrumb />
+      </div>
       <div className={contentGridClassName}>
         {/* Keyed by id so the gallery selection and purchase state reset when navigating between NFTs. */}
         <NftGallery
           imageUrl={nft.imageUrl}
           key={`gallery-${nft.id}`}
           name={nft.name}
+          nftId={nft.id}
         />
         <NftPurchasePanel key={`purchase-${nft.id}`} nft={nft} />
       </div>
