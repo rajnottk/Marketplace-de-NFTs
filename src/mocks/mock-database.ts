@@ -24,9 +24,11 @@ import {
   apeTurtleneckImage,
   nftFixtures,
 } from "mocks/fixtures/nfts";
+import type { VerifiedFirebaseIdentity } from "mocks/auth/verify-firebase-token";
 
 interface MockUser extends User {
   passwordHash: string;
+  firebaseUid?: string;
 }
 
 interface MockState {
@@ -61,7 +63,10 @@ const defaultUser: MockUser = {
   sessionVersion: 1,
 };
 
-const mockUserSchema = userSchema.extend({ passwordHash: z.string() });
+const mockUserSchema = userSchema.extend({
+  passwordHash: z.string(),
+  firebaseUid: z.string().optional(),
+});
 const mockStateSchema = z.object({
   carts: z.record(z.string(), cartSchema),
   favorites: z.record(z.string(), z.array(z.string())),
@@ -272,6 +277,45 @@ export const logout = (sessionToken: string | null) => {
     Object.entries(state.sessions).filter(([token]) => token !== sessionToken),
   );
   commitState({ ...state, sessions });
+};
+
+export const authenticateFirebase = (
+  identity: VerifiedFirebaseIdentity,
+): Session | "conflict" => {
+  const existingUser = state.users.find(
+    (candidate) => candidate.firebaseUid === identity.localId,
+  );
+  // Do not silently link a password account by matching an e-mail address.
+  if (
+    !existingUser &&
+    state.users.some(
+      (candidate) =>
+        candidate.email.toLowerCase() === identity.email.toLowerCase(),
+    )
+  )
+    return "conflict";
+  const user: MockUser = existingUser ?? {
+    id: `firebase-${identity.localId}`,
+    firebaseUid: identity.localId,
+    displayName: identity.displayName?.trim() || identity.email.split("@")[0],
+    email: identity.email,
+    avatarUrl: identity.photoUrl ?? apeTurtleneckImage,
+    passwordHash: "",
+    sessionVersion: 1,
+  };
+  const sessionToken = createToken(user.id);
+  commitState({
+    ...state,
+    users: existingUser ? state.users : [...state.users, user],
+    sessions: { ...state.sessions, [sessionToken]: user.id },
+    carts: { ...state.carts, [user.id]: state.carts[user.id] ?? emptyCart() },
+    favorites: {
+      ...state.favorites,
+      [user.id]: state.favorites[user.id] ?? [],
+    },
+    wallets: { ...state.wallets, [user.id]: state.wallets[user.id] ?? [] },
+  });
+  return { sessionToken, user: toPublicUser(user) };
 };
 
 const trendingSalesThreshold = 100;

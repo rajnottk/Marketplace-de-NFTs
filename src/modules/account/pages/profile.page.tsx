@@ -1,3 +1,4 @@
+import { useAuthModal } from "modules/auth/hooks/use-auth-modal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -15,6 +16,7 @@ import { useSession } from "shared/hooks/use-session";
 
 const ProfilePage = () => {
   const queryClient = useQueryClient();
+  const { openAuth } = useAuthModal();
   const { data: session } = useSession();
   const profileQuery = useQuery({
     queryKey: queryKeys.profile,
@@ -55,12 +57,13 @@ const ProfilePage = () => {
       <main className="mx-auto max-w-5xl px-4 py-10">
         <Card className="p-6 text-center">
           <p className="text-muted">Entre para editar seu perfil.</p>
-          <Link
+          <button
             className="mt-4 inline-block text-accent underline"
-            to="/auth/login"
+            onClick={() => openAuth()}
+            type="button"
           >
             Ir para login
-          </Link>
+          </button>
         </Card>
       </main>
     );

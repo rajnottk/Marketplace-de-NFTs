@@ -1,4 +1,5 @@
 import { apiClient } from "shared/api/api-client";
+import { signOutFirebase } from "shared/lib/firebase";
 import type {
   Cart,
   CatalogResponse,
@@ -115,7 +116,10 @@ export const register = async (
   return response.data;
 };
 
-export const logout = async () => apiClient.post("/auth/logout");
+export const logout = async () => {
+  await apiClient.post("/auth/logout");
+  await signOutFirebase().catch(() => undefined);
+};
 
 export const getFavorites = async () => {
   const response = await apiClient.get<{ ids: string[] }>("/favorites");

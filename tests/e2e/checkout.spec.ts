@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { completeCollectorLogin } from "../helpers/auth";
 
 const fillRequiredFields = async (page: Page) => {
   await page.getByLabel("Nome de usuário").fill("ana-coleciona");
@@ -8,9 +9,12 @@ const fillRequiredFields = async (page: Page) => {
 };
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/auth/login");
-  await page.getByRole("main").getByRole("button", { name: "Entrar" }).click();
-  await expect(page.getByLabel("Perfil de Ana Coleciona")).toBeVisible();
+  await page.goto("/");
+  await page
+    .getByRole("banner")
+    .getByRole("button", { name: "Entrar", exact: true })
+    .click();
+  await completeCollectorLogin(page);
   await page.goto("/nfts/emerald-ape-042");
   await page.getByRole("button", { name: "Comprar" }).click();
   await expect(
@@ -217,9 +221,9 @@ test("segue os controles e o posicionamento do protótipo", async ({
   });
 });
 
-test("conclui uma compra em uma rede sem carteira cadastrada", async ({
+test("confirma a rede selecionada no modal e volta ao início com Escape", async ({
   page,
-}) => {
+}, testInfo) => {
   await fillRequiredFields(page);
   await page.getByRole("combobox", { name: "Rede", exact: true }).click();
   await page.getByRole("option", { name: "Solana", exact: true }).click();
@@ -227,9 +231,111 @@ test("conclui uma compra em uma rede sem carteira cadastrada", async ({
     page.getByRole("button", { name: "Confirmar compra" }),
   ).toBeEnabled();
   await page.getByRole("button", { name: "Confirmar compra" }).click();
+  const modal = page.getByRole("dialog", { name: "Compra confirmada" });
+  await expect(modal).toBeVisible();
+  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(modal.getByText(/Transação confirmada na Solana/)).toBeVisible();
+  await expect(modal).toHaveCSS("background-color", "rgb(36, 22, 18)");
+  await expect(modal).toHaveCSS("border-bottom-width", "10px");
+  await expect(modal).toHaveCSS("border-bottom-color", "rgb(210, 138, 76)");
+  await expect(page.locator('[data-slot="dialog-overlay"]')).toHaveCSS(
+    "background-color",
+    "rgb(20, 13, 10)",
+  );
   await expect(
-    page.getByRole("heading", { name: "ARTE GARANTIDA" }),
+    modal.getByText("Seus NFTs agora estão na sua carteira"),
+  ).toHaveCSS("color", "rgb(207, 178, 140)");
+  const imageBounds = (await modal
+    .getByRole("img", { name: "Emerald Ape #042" })
+    .boundingBox())!;
+  for (const label of ["Taxa de rede", "Total"]) {
+    const labelBounds = (await modal
+      .locator("section dl")
+      .getByText(label, { exact: true })
+      .boundingBox())!;
+    expect(Math.abs(labelBounds.x - imageBounds.x)).toBeLessThan(1);
+  }
+  const bounds = (await modal.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
+  expect(bounds.height).toBeLessThanOrEqual(viewport.height);
+  await page.screenshot({
+    path: testInfo.outputPath("purchase-confirmation.png"),
+  });
+  await page.keyboard.press("Escape");
+  await expect(page).toHaveURL("/");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("fecha a confirmação pelo backdrop e volta ao início", async ({
+  page,
+}) => {
+  await fillRequiredFields(page);
+  await page.getByRole("button", { name: "Confirmar compra" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Compra confirmada" }),
   ).toBeVisible();
+  await page
+    .locator('[data-slot="dialog-overlay"]')
+    .click({ position: { x: 4, y: 4 }, force: true });
+  await expect(page).toHaveURL("/");
+});
+
+test("preserva os NFTs e valores no modal depois de esvaziar o carrinho", async ({
+  page,
+}, testInfo) => {
+  for (const [index, nftId] of [
+    "sage-nomad-009",
+    "neon-vessel-552",
+  ].entries()) {
+    await page.goto(`/nfts/${nftId}`);
+    await page.getByRole("button", { name: "Comprar" }).click();
+    await expect(
+      page.getByRole("link", { name: `Carrinho com ${index + 2} itens` }),
+    ).toBeVisible();
+  }
+  await page.goto("/checkout");
+  await expect(
+    page.getByRole("combobox", { name: "Rede", exact: true }),
+  ).toBeEnabled();
+  await fillRequiredFields(page);
+  const checkoutTotal = await page
+    .getByRole("complementary", { name: "Seus NFTs" })
+    .locator("dl dd")
+    .last()
+    .textContent();
+  await page.getByRole("button", { name: "Confirmar compra" }).click();
+  const modal = page.getByRole("dialog", { name: "Compra confirmada" });
+  await expect(
+    modal.getByRole("list", { name: "NFTs comprados" }).getByRole("listitem"),
+  ).toHaveCount(3);
+  await expect(modal.locator("section dl dd").last()).toHaveText(
+    checkoutTotal!,
+  );
+  await expect(
+    page.getByRole("link", {
+      name: "Carrinho com 0 itens",
+      includeHidden: true,
+    }),
+  ).toHaveCount(1);
+  await expect(modal).toBeVisible();
+  const explorerLink = modal.getByRole("link", { name: "Ver no Etherscan" });
+  if (testInfo.project.name === "desktop") {
+    const dialogBounds = (await modal.boundingBox())!;
+    const linkBounds = (await explorerLink.boundingBox())!;
+    expect(linkBounds.y + linkBounds.height).toBeLessThanOrEqual(
+      dialogBounds.y + dialogBounds.height - 10,
+    );
+  }
+  await page.screenshot({
+    path: testInfo.outputPath("purchase-confirmation-three-nfts.png"),
+  });
+  await explorerLink.scrollIntoViewIfNeeded();
+  await expect(explorerLink).toBeInViewport();
+  await page.screenshot({
+    path: testInfo.outputPath("purchase-confirmation-footer.png"),
+  });
 });
 
 test("mantém as cores do tema no estado de autofill do navegador", async ({

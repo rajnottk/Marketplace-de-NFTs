@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   addToCart,
   authenticate,
+  authenticateFirebase,
   createOrder,
   getCart,
   getCatalog,
@@ -30,6 +31,7 @@ import {
   newsletterSubscriptionSchema,
   walletSchema,
 } from "shared/contracts/marketplace";
+import { verifyFirebaseToken } from "mocks/auth/verify-firebase-token";
 
 const apiError = (
   code: string,
@@ -47,6 +49,7 @@ const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
+const firebaseLoginSchema = z.object({ idToken: z.string().min(1) });
 const registerSchema = z.object({
   displayName: z.string().min(2),
   email: z.string().email(),
@@ -69,6 +72,39 @@ const passwordSchema = z.object({
 const orderSchema = z.object({ network: networkSchema });
 
 export const handlers = [
+  http.post("/api/auth/firebase", async ({ request }) => {
+    const parsed = firebaseLoginSchema.safeParse(await request.json());
+    if (!parsed.success)
+      return apiError(
+        "VALIDATION_ERROR",
+        "Não foi possível validar o login social.",
+        422,
+      );
+    try {
+      const identity = await verifyFirebaseToken(parsed.data.idToken);
+      if (!identity)
+        return apiError(
+          "UNAUTHORIZED",
+          "Não foi possível validar sua conta social. Tente entrar novamente e autorize o compartilhamento do e-mail.",
+          401,
+        );
+      const session = authenticateFirebase(identity);
+      if (session === "conflict")
+        return apiError(
+          "CONFLICT",
+          "Este e-mail já possui uma conta. Entre com seu método original.",
+          409,
+        );
+      mergeGuestCart(session.sessionToken);
+      return HttpResponse.json(session);
+    } catch {
+      return apiError(
+        "NETWORK_ERROR",
+        "Não foi possível validar o login social. Tente novamente.",
+        503,
+      );
+    }
+  }),
   http.post("/api/auth/login", async ({ request }) => {
     await waitForMockNetwork();
     const parsed = loginSchema.safeParse(await request.json());
@@ -97,6 +133,7 @@ export const handlers = [
     );
     if (session === "conflict")
       return apiError("CONFLICT", "Este e-mail já possui uma conta.", 409);
+    mergeGuestCart(session.sessionToken);
     return HttpResponse.json(session, { status: 201 });
   }),
 

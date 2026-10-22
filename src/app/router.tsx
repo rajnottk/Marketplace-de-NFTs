@@ -6,12 +6,10 @@ import {
 import { AppLayout } from "app/app-layout";
 import { ProfilePage } from "modules/account/pages/profile.page";
 import { WalletsPage } from "modules/account/pages/wallets.page";
-import { AuthPage } from "modules/auth/pages/auth.page";
 import { CartPage } from "modules/cart/pages/cart.page";
 import { CatalogPage } from "modules/catalog/pages/catalog.page";
 import { CheckoutPage } from "modules/checkout/pages/checkout.page";
 import { NftDetailPage } from "modules/nft-detail/pages/nft-detail.page";
-import { OrderConfirmationPage } from "modules/orders/pages/order-confirmation.page";
 import { UnderConstructionPage } from "modules/under-construction/pages/under-construction.page";
 import { Button } from "shared/components/ui/button";
 import { catalogSearchSchema } from "shared/contracts/marketplace";
@@ -55,21 +53,6 @@ const checkoutRoute = createRoute({
   path: "/checkout",
   component: CheckoutPage,
 });
-const orderRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/orders/$orderId",
-  component: OrderConfirmationPage,
-});
-const loginRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/auth/login",
-  component: () => <AuthPage mode="login" />,
-});
-const registerRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/auth/register",
-  component: () => <AuthPage mode="register" />,
-});
 const profileRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/account/profile",
@@ -106,9 +89,6 @@ const routeTree = rootRoute.addChildren([
   nftDetailRoute,
   cartRoute,
   checkoutRoute,
-  orderRoute,
-  loginRoute,
-  registerRoute,
   profileRoute,
   walletsRoute,
   creatorsRoute,

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useAuthModal } from "modules/auth/hooks/use-auth-modal";
 import {
   Heart,
   Linkedin,
@@ -63,7 +63,7 @@ interface NftPurchasePanelProps {
 }
 
 const NftPurchasePanel = ({ nft }: NftPurchasePanelProps) => {
-  const navigate = useNavigate();
+  const { openAuth } = useAuthModal();
   const queryClient = useQueryClient();
   const { data: session } = useSession();
   const [quantity, setQuantity] = useState(1);
@@ -97,7 +97,7 @@ const NftPurchasePanel = ({ nft }: NftPurchasePanelProps) => {
 
   const handleFavorite = () => {
     if (!session) {
-      navigate({ to: "/auth/login" });
+      openAuth();
       return;
     }
     favoriteMutation.mutate();

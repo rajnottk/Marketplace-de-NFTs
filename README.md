@@ -308,3 +308,7 @@ npm run audit:lighthouse
 O estado de demonstração é compartilhado entre os handlers REST e persistido localmente para sustentar refresh. Para voltar ao cenário conhecido, limpe o armazenamento do navegador para o host local e recarregue a página. Os handlers cobrem credenciais inválidas, conflito de cadastro, cupom inválido, estoque insuficiente, rota de NFT inexistente, sessão ausente e pedido vazio.
 
 As decisões de sessão, cache, contratos, eventos e desvios provisórios do Figma estão em [ARCHITECTURE.md](ARCHITECTURE.md).
+
+### Autenticação
+
+Login, cadastro e recuperação visual de senha abrem em um modal sobre a página atual. Para habilitar Google e Facebook, siga o [guia passo a passo do Firebase Authentication](docs/firebase-auth.md). E-mail/senha continuam usando a API do marketplace; a recuperação de senha não envia e-mails.

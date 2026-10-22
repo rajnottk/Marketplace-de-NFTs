@@ -1,3 +1,4 @@
+import { useAuthModal } from "modules/auth/hooks/use-auth-modal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Plus, WalletCards } from "lucide-react";
@@ -12,6 +13,7 @@ import type { Network } from "shared/contracts/marketplace";
 
 const WalletsPage = () => {
   const queryClient = useQueryClient();
+  const { openAuth } = useAuthModal();
   const { data: session } = useSession();
   const walletsQuery = useQuery({
     queryKey: queryKeys.wallets,
@@ -48,12 +50,13 @@ const WalletsPage = () => {
       <main className="mx-auto max-w-5xl px-4 py-10">
         <Card className="p-6 text-center">
           <p className="text-muted">Entre para gerenciar carteiras.</p>
-          <Link
+          <button
             className="mt-4 inline-block text-accent underline"
-            to="/auth/login"
+            onClick={() => openAuth()}
+            type="button"
           >
             Ir para login
-          </Link>
+          </button>
         </Card>
       </main>
     );

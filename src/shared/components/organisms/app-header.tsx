@@ -12,6 +12,7 @@ import { Button } from "shared/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "shared/components/ui/tabs";
 import { useSession } from "shared/hooks/use-session";
 import { clearSessionToken } from "shared/lib/session";
+import { useAuthModal } from "modules/auth/hooks/use-auth-modal";
 
 type NavigationTab = "home" | "market" | "creators" | "learn";
 
@@ -42,6 +43,7 @@ const getActiveTab = (currentPath: string): NavigationTab | null => {
 
 const AppHeader = () => {
   const queryClient = useQueryClient();
+  const { openAuth } = useAuthModal();
   const currentPath = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -61,6 +63,7 @@ const AppHeader = () => {
       queryClient.removeQueries({ queryKey: queryKeys.session });
       queryClient.removeQueries({ queryKey: queryKeys.favorites });
       queryClient.removeQueries({ queryKey: queryKeys.wallets });
+      queryClient.removeQueries({ queryKey: queryKeys.profile });
       queryClient.invalidateQueries({ queryKey: queryKeys.cart });
     },
   });
@@ -171,8 +174,7 @@ const AppHeader = () => {
           ) : (
             <Button
               className="h-9 bg-[#D28A4C] px-4 text-base font-medium text-[#140D0A] shadow-none hover:bg-[#D28A4C]/90 [&_svg]:size-5"
-              nativeButton={false}
-              render={<Link to="/auth/login" />}
+              onClick={() => openAuth()}
             >
               <LogIn />
               Entrar

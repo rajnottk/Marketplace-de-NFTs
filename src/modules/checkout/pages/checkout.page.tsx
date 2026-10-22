@@ -3,6 +3,11 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { CollectorForm } from "modules/checkout/components/collector-form";
 import { CheckoutSummary } from "modules/checkout/components/checkout-summary";
+import {
+  OrderConfirmationModal,
+  type PurchaseConfirmation,
+} from "modules/orders/components/order-confirmation-modal";
+import { useAuthModal } from "modules/auth/hooks/use-auth-modal";
 import { getApiError } from "shared/api/api-error";
 import {
   createOrder,
@@ -28,6 +33,7 @@ const defaultNetwork: Network = "Ethereum";
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
+  const { openAuth } = useAuthModal();
   const queryClient = useQueryClient();
   const { data: session, isLoading: isSessionLoading } = useSession();
   const cartQuery = useQuery({ queryKey: queryKeys.cart, queryFn: getCart });
@@ -40,6 +46,10 @@ const CheckoutPage = () => {
   const [isConfirming, setIsConfirming] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("coinbase");
   const [couponError, setCouponError] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<PurchaseConfirmation | null>(
+    null,
+  );
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const lastQuoteAttempt = useRef<string | null>(null);
   const orderKey = useRef<string | null>(null);
   const pendingQuote = useRef<Promise<Quote> | null>(null);
@@ -73,8 +83,25 @@ const CheckoutPage = () => {
       return createOrder(network, orderKey.current);
     },
     onSuccess: (order) => {
+      if (order.status !== "confirmed") {
+        setPurchaseError(() =>
+          order.status === "declined"
+            ? "Pagamento não aprovado. Tente novamente."
+            : "A transação ainda está aguardando confirmação.",
+        );
+        return;
+      }
+      const walletLabels: Record<string, string> = {
+        walletconnect: "WalletConnect",
+        metamask: "MetaMask",
+        coinbase: "Coinbase Wallet",
+      };
+      setConfirmation(() => ({
+        order,
+        confirmedAt: new Date().toISOString(),
+        walletLabel: walletLabels[paymentMethod],
+      }));
       void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
-      void navigate({ to: "/orders/$orderId", params: { orderId: order.id } });
     },
   });
 
@@ -110,6 +137,7 @@ const CheckoutPage = () => {
   const handleConfirm = async () => {
     if (isSubmitting.current) return;
     isSubmitting.current = true;
+    setPurchaseError(() => null);
     setIsConfirming(() => true);
     try {
       // Honor a click during recalculation, using its completed quote for the order.
@@ -123,6 +151,13 @@ const CheckoutPage = () => {
     }
   };
 
+  if (confirmation)
+    return (
+      <OrderConfirmationModal
+        confirmation={confirmation}
+        onClose={() => void navigate({ to: "/" })}
+      />
+    );
   if (isSessionLoading || cartQuery.isPending)
     return (
       <main className={pageClassName}>
@@ -137,7 +172,7 @@ const CheckoutPage = () => {
         <EmptyState
           actionLabel="Entrar"
           description="O pagamento e a emissão do recibo exigem uma conta de colecionador."
-          onAction={() => void navigate({ to: "/auth/login" })}
+          onAction={() => openAuth()}
           title="Entre para continuar"
         />
       </main>
@@ -201,7 +236,10 @@ const CheckoutPage = () => {
         />
         <CheckoutSummary
           couponError={couponError}
-          error={requestError ? getApiError(requestError).message : null}
+          error={
+            purchaseError ??
+            (requestError ? getApiError(requestError).message : null)
+          }
           isOrdering={isConfirming}
           isQuoting={quoteMutation.isPending}
           items={cart.items}

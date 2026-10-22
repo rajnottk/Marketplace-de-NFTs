@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { completeCollectorLogin } from "../helpers/auth";
 
 test("preserva o carrinho do visitante ao autenticar e conclui uma compra", async ({
   page,
@@ -11,9 +12,8 @@ test("preserva o carrinho do visitante ao autenticar e conclui uma compra", asyn
 
   await page.getByRole("link", { name: "Carrinho com 1 itens" }).click();
   await page.getByRole("button", { name: "Conectar e finalizar" }).click();
-  await expect(page).toHaveURL(/\/auth\/login$/);
-  await page.getByRole("main").getByRole("button", { name: "Entrar" }).click();
-  await expect(page.getByLabel("Perfil de Ana Coleciona")).toBeVisible();
+  await expect(page).toHaveURL(/\/cart$/);
+  await completeCollectorLogin(page);
 
   await page.getByRole("link", { name: /Carrinho com 1 itens/ }).click();
   await page.getByPlaceholder("Digite o código promocional...").fill("KURIO10");
@@ -27,10 +27,27 @@ test("preserva o carrinho do visitante ao autenticar e conclui uma compra", asyn
   await page.getByLabel("Nome do perfil").fill("Coleção da Ana");
   await page.getByRole("combobox", { name: "Tipo de carteira" }).click();
   await page.getByRole("option", { name: "MetaMask", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Carteira e rede" })
+    .getByRole("radio", { name: "MetaMask", exact: true })
+    .check();
   await page.getByRole("button", { name: "Confirmar compra" }).click();
 
+  const modal = page.getByRole("dialog", { name: "Compra confirmada" });
+  await expect(modal).toBeVisible();
+  await expect(page).toHaveURL(/\/checkout$/);
   await expect(
-    page.getByRole("heading", { name: "ARTE GARANTIDA" }),
+    modal.getByText("Seus NFTs agora estão na sua carteira"),
   ).toBeVisible();
-  await expect(page.getByText(/0x/)).toBeVisible();
+  await expect(modal.getByText(/^0x[A-F0-9]{4}…[A-F0-9]{4}$/)).toBeVisible();
+  await expect(modal.getByText("MetaMask", { exact: true })).toBeVisible();
+  await expect(
+    modal.getByText(/Transação confirmada na Ethereum/),
+  ).toBeVisible();
+  await expect(
+    modal.getByRole("link", { name: "Ver no Etherscan" }),
+  ).toHaveAttribute("href", "https://etherscan.io/");
+  await modal.getByRole("button", { name: "Fechar confirmação" }).click();
+  await expect(page).toHaveURL("/");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });

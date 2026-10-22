@@ -25,6 +25,7 @@
     "decimal.js": "^10.6.0",
     "embla-carousel-autoplay": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
+    "firebase": "^13.1.0",
     "lucide-react": "^0.544.0",
     "msw": "^2.11.3",
     "react": "^19.1.1",

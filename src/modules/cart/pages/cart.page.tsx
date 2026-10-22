@@ -27,6 +27,7 @@ import {
   CartTableSkeleton,
 } from "modules/cart/components/cart-table";
 import { useSession } from "shared/hooks/use-session";
+import { useAuthModal } from "modules/auth/hooks/use-auth-modal";
 
 const pageClassName = "mx-auto w-full max-w-[1200px] px-4 pb-16 pt-8 xl:px-0";
 const contentGridClassName =
@@ -62,6 +63,7 @@ const CartBreadcrumb = () => (
 const CartPage = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { openAuth } = useAuthModal();
   const { data: session, isLoading: isSessionLoading } = useSession();
   // The mock drops the quote whenever the cart changes, so the applied coupon lives here and is re-sent on every recalculation.
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
@@ -159,7 +161,11 @@ const CartPage = () => {
     } catch {
       return;
     }
-    void navigate({ to: session ? "/checkout" : "/auth/login" });
+    if (!session) {
+      openAuth();
+      return;
+    }
+    void navigate({ to: "/checkout" });
   };
 
   const requestError =

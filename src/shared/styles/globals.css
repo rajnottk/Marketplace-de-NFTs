@@ -58,6 +58,14 @@ input:is(:autofill, :-webkit-autofill) {
   caret-color: var(--color-foreground);
 }
 
+/* Keep the native password input for autofill while the visual mask uses asterisks. */
+input[data-password-masked="true"],
+input[data-password-masked="true"]:is(:autofill, :-webkit-autofill) {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: var(--color-foreground);
+}
+
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
